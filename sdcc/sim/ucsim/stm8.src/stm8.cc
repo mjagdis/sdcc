@@ -77,7 +77,12 @@ cl_stm8::init(void)
 {
   cl_uc::init(); /* Memories now exist */
 
-  xtal = 8000000;
+  // MAIN and IDLE (wait for interrupt) counters are created by default. We also
+  // need HALT (powered down).
+  class cl_ticker *ticker;
+
+  ticker= new cl_ticker("halt", true, ticks->freq, +1, stPD);
+  add_counter(ticker, ticker->get_name());
 
   //rom = address_space(MEM_ROM_ID);
   //ram = mem(MEM_XRAM);
@@ -273,8 +278,8 @@ cl_stm8::mk_hw_elements(void)
   
   if (type->type == CPU_STM8S)
     {
-      add_hw(h= new cl_clk_saf(this));
-      h->init();
+      add_hw(clk= new cl_clk_saf(this));
+      clk->init();
       if (type->subtype & (DEV_STM8S003|
 			   DEV_STM8S007|
 			   DEV_STM8S103|
@@ -309,8 +314,8 @@ cl_stm8::mk_hw_elements(void)
     }
   if (type->type == CPU_STM8L)
     {
-      add_hw(h= new cl_clk_all(this));
-      h->init();
+      add_hw(clk= new cl_clk_all(this));
+      clk->init();
       add_hw(h= new cl_serial(this, 0x5230, 1, 27, 28));
       h->init();
       if (type->subtype & (DEV_STM8AL3xE|
@@ -334,8 +339,8 @@ cl_stm8::mk_hw_elements(void)
     }
   if (type->type == CPU_STM8L101)
     {
-      add_hw(h= new cl_clk_l101(this));
-      h->init();
+      add_hw(clk= new cl_clk_l101(this));
+      clk->init();
       add_hw(h= new cl_serial(this, 0x5230, 1, 27, 28));
       h->init();
     }
@@ -980,6 +985,41 @@ cl_stm8::print_regs(class cl_console_base *con)
  * Execution
  */
 
+// There are three clocks derived from each other. The XTAL
+// clock, f_OSC is the fundamental frequency. This is then
+// scaled down to give the master clock, f_MASTER, which is
+// the clock used to drive the hardware elements. This, in
+// turn, is further scaled down to give the CPU clock, f_CPU,
+// which is used to drive the CPU.
+// Only some variants of STM8 support both scaling factors and
+// both factors and f_OSC can be changed programmatically.
+
+int
+cl_stm8::clock_per_cycle(void)
+{
+  return clk->clock_per_cycle();
+}
+
+int
+cl_stm8::tick(int cycles_cpu)
+{
+  return tick_master(cycles_cpu * clock_per_cycle());
+}
+
+int
+cl_stm8::tick_master(int cycles_master)
+{
+  ticks->tick(this, 0, cycles_master * ticks->freq / xtal);
+  update_tickers(true, ticks->freq, cycles_master * ticks->freq / xtal);
+
+  // tick for hardwares
+  if (state != stPD)
+    inst_ticks+= cycles_master;
+
+  update_tickers(false, xtal, cycles_master);
+  return 0;
+}
+
 int
 cl_stm8::exec_inst(void)
 {
@@ -1005,6 +1045,8 @@ cl_stm8::exec_inst(void)
     //printf("******************** break \n");
 	  return(resBREAKPOINT);
   }
+
+  // FIXME: we need to do the right number of cycles for each instruction
   tick(1);
 
   switch (code)
