@@ -155,13 +155,13 @@ cl_tim::reset(void)
   prescaler_preload= 0;
 
   for (i= 0; i<32+6; i++)
-    regs[i]->set(0);
+    regs[i]->write(0);
   if (bits > 8)
-    regs[idx.arrh]->set(0xff);
-  regs[idx.arrl]->set(0xff);
+    regs[idx.arrh]->write(0xff);
+  regs[idx.arrl]->write(0xff);
 
   update_event();
-  regs[idx.sr1]->set_bit0(uif);
+  regs[idx.sr1]->write_bit0(uif);
 }
 
 void
@@ -276,14 +276,12 @@ cl_tim::write(class cl_memory_cell *cell, t_mem *val)
     }
   else if (a == idx.arrl)
     {
-      u8_t l, h= 0;
       if ((regs[idx.cr1]->get() & arpe) != 0)
 	{
-	  regs[idx.arrl]->set(l= *val);
 	  if (idx.arrh > 0)
-	    regs[idx.arrh]->set(h= arr_ms_buffer);
+	    regs[idx.arrh]->write(arr_ms_buffer);
 	  if ((regs[idx.cr1]->get() & arpe) == 0)
-	    set_counter(h*256 + l);
+	    set_counter(arr_ms_buffer*256 + *val);
 	}
     }
 }
@@ -302,7 +300,7 @@ cl_tim::conf_op(cl_memory_cell *cell, t_addr addr, t_mem *val)
 	    on= false;
 	}
       else
-	cell->set(on?1:0);
+	cell->write(on?1:0);
       break;
     case stm8_tim_nuof_cfg:
       break;
@@ -327,7 +325,7 @@ cl_tim::count(void)
 	    set_counter(0);
 	  else
 	    // center aligned
-	    regs[idx.cr1]->set(c1|= dir);
+	    regs[idx.cr1]->write(c1|= dir);
 	  if ((c1 & udis) == 0)
 	    update_event();
 	}
@@ -343,7 +341,7 @@ cl_tim::count(void)
 	    set_counter(get_arr());
 	  else
 	    // center aligned
-	    regs[idx.cr1]->set(c1&= ~dir);
+	    regs[idx.cr1]->write(c1&= ~dir);
 	  if ((c1 & udis) == 0)
 	    update_event();
 	}
@@ -362,9 +360,9 @@ u16_t
 cl_tim::set_counter(u16_t val)
 {
   cnt= val & mask;
-  regs[idx.cntrl]->set(val&0xff);
+  regs[idx.cntrl]->write(val&0xff);
   if (bits > 8)
-    regs[idx.cntrh]->set(val>>8);
+    regs[idx.cntrh]->write(val>>8);
   return val;
 }
 
@@ -374,7 +372,7 @@ cl_tim::update_event(void)
   u8_t c1= regs[idx.cr1]->get();
 
   if (c1 & opm)
-    regs[idx.cr1]->set_bit0(cen);
+    regs[idx.cr1]->write_bit0(cen);
   else
     {
       if (get_dir())
