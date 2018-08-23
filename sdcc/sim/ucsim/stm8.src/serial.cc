@@ -80,6 +80,7 @@ cl_serial::cl_serial(class cl_uc *auc,
 
 cl_serial::~cl_serial(void)
 {
+  hw_updating = 0;
 }
 
 int
@@ -95,24 +96,22 @@ cl_serial::init(void)
     {
       regs[i]= register_cell(uc->rom, base+i);
     }
-  pick_div();
-  pick_ctrl();
 
   uc->it_sources->add(is= new cl_it_src(uc, txit,
-					regs[cr2], 0x80,
-					regs[sr], 0x80,
+					regs[cr2], UART_CR2_TIEN,
+					regs[sr], UART_SR_TXE,
 					0x8008+txit*4, false, false,
 					chars("", "usart%d transmit register empty", id), 20*10+1));
   is->init();
   uc->it_sources->add(is= new cl_it_src(uc, txit,
-					regs[cr2], 0x40,
-					regs[sr], 0x40,
+					regs[cr2], UART_CR2_TCIEN,
+					regs[sr], UART_SR_TC,
 					0x8008+txit*4, false, false,
 					chars("", "usart%d transmit complete", id), 20*10+2));
   is->init();
   uc->it_sources->add(is= new cl_it_src(uc, rxit,
-					regs[cr2], 0x20,
-					regs[sr], 0x20,
+					regs[cr2], UART_CR2_RIEN,
+					regs[sr], UART_SR_RXNE,
 					0x8008+rxit*4, false, false,
 					chars("", "usart%d receive", id), 20*10+3));
   is->init();
@@ -138,11 +137,13 @@ cl_serial::read(class cl_memory_cell *cell)
 {
   if (cell == regs[dr])
     {
+      hw_updating++;
       if (sr_read)
-	regs[sr]->set_bit0(0x1f);
-      regs[sr]->set_bit0(0x20);
+	regs[sr]->write_bit0(UART_SR_IDLE | UART_SR_OR | UART_SR_NF | UART_SR_FE | UART_SR_PE);
+      regs[sr]->write_bit0(UART_SR_RXNE);
       cfg_set(serconf_able_receive, 1);
-      return s_in;
+      hw_updating--;
+      return regs[dr]->get();
     }
   sr_read= (cell == regs[sr]);
   conf(cell, NULL);
@@ -154,41 +155,87 @@ cl_serial::write(class cl_memory_cell *cell, t_mem *val)
 {
   if (conf(cell, val))
     return;
+
   if (cell == regs[sr])
     {
-      u8_t v= cell->get();
-      if ((*val & 0x40) == 0)
-	{
-	  v&= ~0x40;
-	  *val= v;
-	}
+      if (!hw_updating)
+        {
+          // The only change allowed is to set TC to 0
+          // FIXME: RXNE can be set to 0 for UART2 and UART3
+          if ((*val & UART_SR_TC) == 0)
+	      *val= cell->get() & (~UART_SR_TC);
+        }
     }
-  else
+  else if (cell == regs[brr1])
     {
-      cell->set(*val);
-      if ((cell == regs[brr1]) ||
-	  (cell == regs[brr2]))
+      u8_t b1= regs[brr1]->get();
+      u8_t b2= regs[brr2]->get();
+      uart_div= ((b2 & 0xf0) << 8) + (b1 << 4) + (b2 & 0xf);
+      // Specs say UART_DIV must be always be greater than or equal to 16.
+      if (uart_div < 16)
+        uart_div= 16;
+      sample_div= uart_div >> 4;
+      sample_clk= 0;
+      uart_clk= 0;
+    }
+  else if (cell == regs[cr1] || cell == regs[cr3])
+    {
+      if (*val & UART_CR1_M)
+        bitclkmax = 2 * (1 + 9 + 1);
+      else
+        {
+          bitclkmax = 2 * (1 + 8);
+	  switch ((regs[cr3]->get() >> 4) & 0x03) {
+            case 0x00:
+            case 0x01:
+              bitclkmax += 2;
+	      break;
+            case 0x02:
+              bitclkmax += 4;
+	      break;
+            case 0x03:
+              bitclkmax += 3;
+	      break;
+	  }
+        }
+    }
+  else if (cell == regs[cr2])
+    {
+      t_mem cr2_val = regs[cr2]->get();
+
+      if (!(cr2_val & UART_CR2_TEN) && (*val & UART_CR2_TEN))
+        {
+	  // UM 22.3.2: An idle frame will be sent after the TEN bit is enabled.
+          // UM 22.7.6: When TEN is set there is a 1 bit-time delay before the transmission starts.
+          s_tr_bit = -(bitclkmax + 1);
+        }
+      if ((cr2_val & UART_CR2_REN) && !(*val & UART_CR2_REN))
+        {
+          // If the REN bit is reset the reception of the current character is aborted.
+	  s_receiving= 0;
+	  s_rec_bit= 0;
+        }
+    }
+  else if (cell == regs[dr] && !hw_updating)
+    {
+      hw_updating++;
+      if (sr_read)
+        regs[sr]->write_bit0(UART_SR_TC);
+
+      if (!s_sending && (regs[cr2]->get() & UART_CR2_TEN))
 	{
-	  pick_div();
+          s_out= *val;
+          s_sending= true;
+	  // TXE should already be set but we need to do this to generate an interrupt.
+          regs[sr]->write_bit1(UART_SR_TXE);
 	}
-      else if ((cell == regs[cr1]) ||
-	       (cell == regs[cr2]))
+      else
 	{
-	  pick_ctrl();
+          s_txd= *val;
+          regs[sr]->write_bit0(UART_SR_TXE);
 	}
-  
-      else if (cell == regs[dr])
-	{
-	  s_txd= *val;
-	  s_tx_written= true;
-	  show_writable(false);
-	  if (sr_read)
-	    show_tx_complete(false);
-	  if (!s_sending)
-	    {
-	      start_send();
-	    }      
-	}
+
+      hw_updating--;
     }
 
   sr_read= false;
@@ -212,7 +259,7 @@ cl_serial::conf_op(cl_memory_cell *cell, t_addr addr, t_mem *val)
 	}
       else
 	{
-	  cell->set(on?1:0);
+	  cell->write(on?1:0);
 	}
       break;
       */
@@ -225,118 +272,94 @@ cl_serial::conf_op(cl_memory_cell *cell, t_addr addr, t_mem *val)
 int
 cl_serial::tick(int cycles)
 {
-  char c;
+  if (!clk_enabled)
+    return 0;
 
-  if (!en ||
-      !clk_enabled)
-    return 0;
-  
-  if ((mcnt+= cycles) >= div)
+  for (sample_clk += cycles; sample_clk >= sample_div; sample_clk -= sample_div)
     {
-      mcnt-= div;
-      if (ten)
-	s_tr_bit++;
-      if (ren)
-	s_rec_bit++;
+      hw_updating++;
+
+      uart_clk += sample_div;
+
+      if (uart_clk >= uart_div)
+        {
+          uart_clk -= uart_div;
+
+          if (!(regs[cr1]->get() & UART_CR1_UARTD))
+            {
+              if (s_sending && (regs[cr2]->get() & UART_CR2_TEN) && ++s_tr_bit >= bitclkmax)
+                {
+                  io->dd_printf("%c", s_out);
+                  if (!(regs[sr]->get() & UART_SR_TXE))
+                    {
+                      s_tr_bit-= bitclkmax;
+                      s_out= s_txd;
+                      s_sending= true;
+                      regs[sr]->write_bit1(UART_SR_TXE);
+                    }
+                  else
+                    {
+                      s_tr_bit= 0;
+                      s_sending= false;
+                      regs[sr]->write_bit1(UART_SR_TC);
+                    }
+                }
+
+              if (s_receiving && (regs[cr2]->get() & UART_CR2_REN) && ++s_rec_bit >= bitclkmax)
+                {
+                  dr->write(input);
+                  cfg_write(serconf_received, input);
+                  input_avail= false;
+                  s_receiving= false;
+                  s_rec_bit-= bitclkmax;
+
+                  if (!(regs[sr]->get() & UART_SR_RXNE))
+                    regs[sr]->write_bit1(UART_SR_RXNE);
+                  else
+                    regs[sr]->write_bit1(UART_SR_OR);
+                }
+            }
+        }
+
+      // Start bits can begin on any sample tick rather than a baud clock tick
+      // so we check for more input every sample. But _after_ we have checked
+      // for a RX completion on a baud clock tick otherwise we will introduce
+      // cycle delays between back-to-back frames that shouldn't be there.
+      if (!(cr1->get() & UART_CR1_UARTD) && !s_receiving && io->get_fin())
+        {
+          if (cfg_get(serconf_check_often))
+            {
+              if (io->input_avail())
+                io->proc_input(0);
+            }
+
+          if (input_avail)
+            s_receiving= true;
+          else if (!(regs[sr]->get() & UART_SR_IDLE))
+            {
+              s_rec_bit= 0;
+              regs[sr]->write_bit1(UART_SR_IDLE);
+            }
+        }
+
+      hw_updating--;
     }
-  else
-    return 0;
-  
-  if (s_sending &&
-      (s_tr_bit >= bits))
-    {
-      s_sending= false;
-      //io->dd_printf("%c", s_out);
-      io->write((char*)&s_out, 1);
-      s_tr_bit-= bits;
-      if (s_tx_written)
-	restart_send();
-      else
-	finish_send();
-    }
-  if ((ren) &&
-      io->get_fin() &&
-      !s_receiving)
-    {
-      if (cfg_get(serconf_check_often))
-	{
-	  if (io->input_avail())
-	    io->proc_input(0);
-	}
-      if (input_avail)
-	{
-	  s_receiving= true;
-	  s_rec_bit= 0;
-	}
-      else
-	show_idle(true);
-    }
-  if (s_receiving &&
-      (s_rec_bit >= bits))
-    {
-	{
-	  c= input;
-	  input_avail= false;
-	  s_in= c;
-	  received();
-	}
-      s_receiving= false;
-      s_rec_bit-= bits;
-    }
-  
+
   return(0);
-}
-
-void
-cl_serial::start_send()
-{
-  if (ten)
-    {
-      s_out= s_txd;
-      s_tx_written= false;
-      s_sending= true;
-      s_tr_bit= 0;
-      show_writable(true);
-    }
-}
-
-void
-cl_serial::restart_send()
-{
-  if (ten)
-    {
-      s_out= s_txd;
-      s_tx_written= false;
-      s_sending= true;
-      s_tr_bit= 0;
-      show_writable(true);
-    }
-}
-
-void
-cl_serial::finish_send()
-{
-  show_writable(true);
-  show_tx_complete(true);
-}
-
-void
-cl_serial::received()
-{
-  set_dr(s_in);
-  cfg_write(serconf_received, s_in);
-  if (regs[sr]->get() & 0x20)
-    regs[sr]->set_bit1(0x08); // overrun
-  show_readable(true);
 }
 
 void
 cl_serial::reset(void)
 {
   int i;
-  regs[sr]->set(0xc0);
+  hw_updating++;
   for (i= 2; i < 12; i++)
-    regs[i]->set(0);
+    regs[i]->write(0);
+  regs[sr]->write(UART_SR_TXE | UART_SR_TC);
+  hw_updating--;
+
+  s_rec_bit= s_tr_bit= 0;
+  s_receiving= false;
 }
 
 void
@@ -354,76 +377,9 @@ cl_serial::happen(class cl_hw *where, enum hw_event he,
 }
 
 void
-cl_serial::pick_div()
-{
-  u8_t b1= regs[brr1]->get();
-  u8_t b2= regs[brr2]->get();
-  div= ((((b2&0xf0)<<4) + b1)<<4) + (b2&0xf);
-  mcnt= 0;
-}
-
-void
-cl_serial::pick_ctrl()
-{
-  u8_t c1= regs[cr1]->get();
-  u8_t c2= regs[cr2]->get();
-  en= !(c1 & 0x20);
-  ten= c2 & 0x08;
-  ren= c2 & 0x04;
-  bits= 10;
-  s_rec_bit= s_tr_bit= 0;
-  s_receiving= false;
-  s_tx_written= false;
-}
-
-void
-cl_serial::show_writable(bool val)
-{
-  if (val)
-    // TXE=1
-    regs[sr]->write_bit1(0x80);
-  else
-    // TXE=0
-    regs[sr]->write_bit0(0x80);
-}
-
-void
-cl_serial::show_readable(bool val)
-{
-  if (val)
-    regs[sr]->write_bit1(0x20);
-  else
-    regs[sr]->write_bit0(0x20);
-}
-
-void
-cl_serial::show_tx_complete(bool val)
-{
-  if (val)
-    regs[sr]->write_bit1(0x40);
-  else
-    regs[sr]->write_bit0(0x40);
-}
-
-void
-cl_serial::show_idle(bool val)
-{
-  if (val)
-    regs[sr]->write_bit1(0x10);
-  else
-    regs[sr]->write_bit0(0x10);
-}
-
-void
-cl_serial::set_dr(t_mem val)
-{
-  regs[dr]->set(val);
-}
-
-void
 cl_serial::print_info(class cl_console_base *con)
 {
-  con->dd_printf("%s[%d] at 0x%06x %s\n", id_string, id, base, on?"on":"off");
+  con->dd_printf("%s[%d] at 0x%06x %s\n", id_string, id, base, ((regs[cr1]->get() & UART_CR1_UARTD) ? "off" : "on"));
   con->dd_printf("clk %s\n", clk_enabled?"enabled":"disabled");
   con->dd_printf("Input: ");
   class cl_f *fin= io->get_fin(), *fout= io->get_fout();
