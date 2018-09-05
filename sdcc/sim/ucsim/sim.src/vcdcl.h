@@ -34,30 +34,40 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 class cl_vcd: public cl_hw
 {
  protected:
-  class cl_list *locs;
-  bool started, paused;
-  class cl_f *fout;
-  bool change;
-  double change_time;
+  char *filename;
+  FILE *fd;
+  struct vcdvar *vars;
+  double starttime, timescale, event;
+  int state;
+  bool started, paused, dobreak;
   chars modul;
+  char word[64];
  public:
   cl_vcd(class cl_uc *auc, int aid, chars aid_string);
 
-  virtual void add(class cl_memory_cell *cell);
-  virtual bool add(class cl_memory *m, t_addr a, class cl_console_base *con);
-  virtual void del(class cl_memory_cell *cell);
-  virtual bool del(class cl_memory *m, t_addr a, class cl_console_base *con);
   virtual void set_cmd(class cl_cmdline *cmdline, class cl_console_base *con);
 
   virtual t_mem read(class cl_memory_cell *cell);
   virtual void write(class cl_memory_cell *cell, t_mem *val);
   virtual t_mem conf_op(cl_memory_cell *cell, t_addr addr, t_mem *val);
   virtual char *cfg_help(t_addr addr);
-  
-  virtual void report(class cl_memory_cell *cell, int nr);
+
   virtual int tick(int cycles);
 
   virtual void print_info(class cl_console_base *con);
+
+ private:
+  bool read_word(unsigned int i);
+  void clear_vars(void);
+  void add_var(class cl_console_base *con, class cl_memory_cell *cell, int bitnr_low, int bitnr_high)
+    {
+      add_var(con, 0, cell, bitnr_low, bitnr_high);
+    }
+  void add_var(class cl_console_base *con, char id, class cl_memory_cell *cell, int bitnr_low, int bitnr_high);
+  void add_var(class cl_console_base *con, class cl_memory *m, t_addr a, int bitnr_low, int bitnr_high);
+  void del_var(class cl_console_base *con, class cl_memory_cell *cell, int bitnr_low, int bitnr_high);
+  void del_var(class cl_console_base *con, class cl_memory *m, t_addr a, int bitnr_low, int bitnr_high);
+  void report(int nr, struct vcdvar *vcdvar, t_mem v);
 };
 
 
