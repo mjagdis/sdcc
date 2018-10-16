@@ -68,10 +68,9 @@ enum reg_idx {
 
 cl_serial::cl_serial(class cl_uc *auc,
 		     t_addr abase,
-		     int ttype, int atxit, int arxit):
-  cl_serial_hw(auc, ttype, "uart")
+		     int aid, int atxit, int arxit):
+  cl_serial_hw(auc, aid, "uart")
 {
-  type= ttype;
   base= abase;
   txit= atxit;
   rxit= arxit;
@@ -86,32 +85,139 @@ cl_serial::~cl_serial(void)
 int
 cl_serial::init(void)
 {
-  int i;
   class cl_it_src *is;
-  
-  set_name("stm8_uart");
+
   cl_serial_hw::init();
-  clk_enabled= false;
-  for (i= 0; i < 12; i++)
+
+  if (uc->type->subtype & (DEV_STM8S003|
+                           DEV_STM8S007|
+                           DEV_STM8S103|
+                           DEV_STM8S207|
+                           DEV_STM8S208|
+                           DEV_STM8S903|
+                           DEV_STM8AF52))
     {
-      regs[i]= register_cell(uc->rom, base+i);
+      chars s("uart");
+      s.append("%d", id);
+      set_name(s);
+    }
+  else
+    {
+      chars s("usart");
+      s.append("%d", id);
+      set_name(s);
     }
 
+  clk_enabled= false;
+
+  hwreg(uc->rom, base+0, "SR", "Status register",
+    "TXE",    7, 7, "Transmit data register empty",
+    "TC",     6, 6, "Transmit complete",
+    "RXNE",   5, 5, "Read data register not empty",
+    "IDLE",   4, 4, "IDLE line detected",
+    "OR_LHE", 3, 3, "Overrun error / LIN header error",
+    "NF",     2, 2, "Noise flag",
+    "FE",     1, 1, "Framing error",
+    "PE",     0, 0, "Parity error",
+    NULL);
+  sr = register_cell(uc->rom, base+0);
+
+  hwreg(uc->rom, base+1, "DR", "Data register", NULL);
+  dr = register_cell(uc->rom, base+1);
+
+  hwreg(uc->rom, base+2, "BRR1", "Baud rate register 1", NULL);
+  brr1 = register_cell(uc->rom, base+2);
+
+  hwreg(uc->rom, base+3, "BRR2", "Baud rate register 2", NULL);
+  brr2 = register_cell(uc->rom, base+3);
+
+  hwreg(uc->rom, base+4, "CR1", "Control register 1",
+    "R8",    7, 7, "Receive data bit 8",
+    "T8",    6, 6, "Transmit data bit 8",
+    "UARTD", 5, 5, "UART disable (for low power consumption)",
+    "M",     4, 4, "Word length",
+    "WAKE",  3, 3, "Wakeup method",
+    "PCEN",  2, 2, "Parity control enable",
+    "PS",    1, 1, "Parity selection",
+    "PIEN",  0, 0, "Parity interrupt enable",
+    NULL);
+  cr1 = register_cell(uc->rom, base+4);
+
+  hwreg(uc->rom, base+5, "CR2", "Control register 2",
+    "TIEN",  7, 7, "Transmitter interrupt enable",
+    "TCIEN", 6, 6, "Transmission complete interrupt enable",
+    "RIEN",  5, 5, "Receiver interrupt enable",
+    "ILIEN", 4, 4, "IDLE line interrupt enable",
+    "TEN",   3, 3, "Transmitter enable",
+    "REN",   2, 2, "Receiver enable",
+    "RWU",   1, 1, "Receiver wakeup",
+    "SBRK",  0, 0, "Send break",
+    NULL);
+  cr2 = register_cell(uc->rom, base+5);
+
+  hwreg(uc->rom, base+6, "CR3", "Control register 3",
+    "LINEN", 6, 6, "LIN mode enable",
+    "STOP",  5, 4, "STOP bits",
+    "CLKEN", 3, 3, "Clock enable",
+    "CPOL",  2, 2, "Clock polarity",
+    "CPHA",  1, 1, "Clock phase",
+    "LBCL",  0, 0, "Last bit clock pulse",
+    NULL);
+  cr3 = register_cell(uc->rom, base+6);
+
+  hwreg(uc->rom, base+7, "CR4", "Control register 4",
+    "LBDIEN", 6, 6, "LIN Break Detection Interrupt Enable",
+    "LBDL",   5, 5, "LIN Break Detection Length",
+    "LBDF",   4, 4, "LIN Break Detection Flag",
+    "ADD",    3, 0, "Address of the UART node",
+    NULL);
+  //cr4 = register_cell(uc->rom, base+7);
+
+  hwreg(uc->rom, base+8, "CR5", "Control register 5",
+    "SCEN",  5, 5, "Smartcard mode enable",
+    "NACK",  4, 4, "Smartcard NACK enable",
+    "HDSEL", 3, 3, "Half-Duplex Selection",
+    "IRLP",  2, 2, "IrDA Low Power",
+    "IREN",  1, 1, "IrDA mode enable",
+    NULL);
+  //cr5 = register_cell(uc->rom, base+8);
+
+  hwreg(uc->rom, base+9, "CR6", "Control register 6",
+    "LDUM",   7, 7, "LIN Divider Update Method",
+    "LSLV",   5, 5, "LIN Slave Enable",
+    "LASE",   4, 4, "LIN automatic resynchronization enable",
+    "LHDIEN", 2, 2, "LIN Header Detection Interrupt Enable",
+    "LHDF",   1, 1, "LIN Header Detection Flag",
+    "LSF",    0, 0, "LIN Sync Field",
+    NULL);
+  //cr6 = register_cell(uc->rom, base+9);
+
+  hwreg(uc->rom, base+10, "GTR", "Guard time register",
+    "GT", 7, 0, "Guard time value",
+    NULL);
+  //gtr = register_cell(uc->rom, base+10);
+
+  hwreg(uc->rom, base+11, "PSCR", "Prescalar register",
+    "PSC", 7, 0, "Prescalar value",
+    NULL);
+  //pscr = register_cell(uc->rom, base+11);
+
+
   uc->it_sources->add(is= new cl_it_src(uc, txit,
-					regs[cr2], UART_CR2_TIEN,
-					regs[sr], UART_SR_TXE,
+					cr2, UART_CR2_TIEN,
+					sr, UART_SR_TXE,
 					0x8008+txit*4, false, false,
 					chars("", "usart%d transmit register empty", id), 20*10+1));
   is->init();
   uc->it_sources->add(is= new cl_it_src(uc, txit,
-					regs[cr2], UART_CR2_TCIEN,
-					regs[sr], UART_SR_TC,
+					cr2, UART_CR2_TCIEN,
+					sr, UART_SR_TC,
 					0x8008+txit*4, false, false,
 					chars("", "usart%d transmit complete", id), 20*10+2));
   is->init();
   uc->it_sources->add(is= new cl_it_src(uc, rxit,
-					regs[cr2], UART_CR2_RIEN,
-					regs[sr], UART_SR_RXNE,
+					cr2, UART_CR2_RIEN,
+					sr, UART_SR_RXNE,
 					0x8008+rxit*4, false, false,
 					chars("", "usart%d receive", id), 20*10+3));
   is->init();
@@ -135,17 +241,17 @@ cl_serial::added_to_uc(void)
 t_mem
 cl_serial::read(class cl_memory_cell *cell)
 {
-  if (cell == regs[dr])
+  if (cell == dr)
     {
       hw_updating++;
       if (sr_read)
-	regs[sr]->write_bit0(UART_SR_IDLE | UART_SR_OR | UART_SR_NF | UART_SR_FE | UART_SR_PE);
-      regs[sr]->write_bit0(UART_SR_RXNE);
+	sr->write_bit0(UART_SR_IDLE | UART_SR_OR | UART_SR_NF | UART_SR_FE | UART_SR_PE);
+      sr->write_bit0(UART_SR_RXNE);
       cfg_set(serconf_able_receive, 1);
       hw_updating--;
-      return regs[dr]->get();
+      return dr->get();
     }
-  sr_read= (cell == regs[sr]);
+  sr_read= (cell == sr);
   conf(cell, NULL);
   return cell->get();
 }
@@ -156,7 +262,7 @@ cl_serial::write(class cl_memory_cell *cell, t_mem *val)
   if (conf(cell, val))
     return;
 
-  if (cell == regs[sr])
+  if (cell == sr)
     {
       if (!hw_updating)
         {
@@ -166,10 +272,10 @@ cl_serial::write(class cl_memory_cell *cell, t_mem *val)
 	      *val= cell->get() & (~UART_SR_TC);
         }
     }
-  else if (cell == regs[brr1])
+  else if (cell == brr1)
     {
-      u8_t b1= regs[brr1]->get();
-      u8_t b2= regs[brr2]->get();
+      u8_t b1= brr1->get();
+      u8_t b2= brr2->get();
       uart_div= ((b2 & 0xf0) << 8) + (b1 << 4) + (b2 & 0xf);
       // Specs say UART_DIV must be always be greater than or equal to 16.
       if (uart_div < 16)
@@ -178,14 +284,14 @@ cl_serial::write(class cl_memory_cell *cell, t_mem *val)
       sample_clk= 0;
       uart_clk= 0;
     }
-  else if (cell == regs[cr1] || cell == regs[cr3])
+  else if (cell == cr1 || cell == cr3)
     {
       if (*val & UART_CR1_M)
         bitclkmax = 2 * (1 + 9 + 1);
       else
         {
           bitclkmax = 2 * (1 + 8);
-	  switch ((regs[cr3]->get() >> 4) & 0x03) {
+	  switch ((cr3->get() >> 4) & 0x03) {
             case 0x00:
             case 0x01:
               bitclkmax += 2;
@@ -199,9 +305,9 @@ cl_serial::write(class cl_memory_cell *cell, t_mem *val)
 	  }
         }
     }
-  else if (cell == regs[cr2])
+  else if (cell == cr2)
     {
-      t_mem cr2_val = regs[cr2]->get();
+      t_mem cr2_val = cr2->get();
 
       if (!(cr2_val & UART_CR2_TEN) && (*val & UART_CR2_TEN))
         {
@@ -216,23 +322,23 @@ cl_serial::write(class cl_memory_cell *cell, t_mem *val)
 	  s_rec_bit= 0;
         }
     }
-  else if (cell == regs[dr] && !hw_updating)
+  else if (cell == dr && !hw_updating)
     {
       hw_updating++;
       if (sr_read)
-        regs[sr]->write_bit0(UART_SR_TC);
+        sr->write_bit0(UART_SR_TC);
 
-      if (!s_sending && (regs[cr2]->get() & UART_CR2_TEN))
+      if (!s_sending && (cr2->get() & UART_CR2_TEN))
 	{
           s_out= *val;
           s_sending= true;
 	  // TXE should already be set but we need to do this to generate an interrupt.
-          regs[sr]->write_bit1(UART_SR_TXE);
+          sr->write_bit1(UART_SR_TXE);
 	}
       else
 	{
           s_txd= *val;
-          regs[sr]->write_bit0(UART_SR_TXE);
+          sr->write_bit0(UART_SR_TXE);
 	}
 
       hw_updating--;
@@ -285,27 +391,27 @@ cl_serial::tick(int cycles)
         {
           uart_clk -= uart_div;
 
-          if (!(regs[cr1]->get() & UART_CR1_UARTD))
+          if (!(cr1->get() & UART_CR1_UARTD))
             {
-              if (s_sending && (regs[cr2]->get() & UART_CR2_TEN) && ++s_tr_bit >= bitclkmax)
+              if (s_sending && (cr2->get() & UART_CR2_TEN) && ++s_tr_bit >= bitclkmax)
                 {
                   io->dd_printf("%c", s_out);
-                  if (!(regs[sr]->get() & UART_SR_TXE))
+                  if (!(sr->get() & UART_SR_TXE))
                     {
                       s_tr_bit-= bitclkmax;
                       s_out= s_txd;
                       s_sending= true;
-                      regs[sr]->write_bit1(UART_SR_TXE);
+                      sr->write_bit1(UART_SR_TXE);
                     }
                   else
                     {
                       s_tr_bit= 0;
                       s_sending= false;
-                      regs[sr]->write_bit1(UART_SR_TC);
+                      sr->write_bit1(UART_SR_TC);
                     }
                 }
 
-              if (s_receiving && (regs[cr2]->get() & UART_CR2_REN) && ++s_rec_bit >= bitclkmax)
+              if (s_receiving && (cr2->get() & UART_CR2_REN) && ++s_rec_bit >= bitclkmax)
                 {
                   dr->write(input);
                   cfg_write(serconf_received, input);
@@ -313,10 +419,10 @@ cl_serial::tick(int cycles)
                   s_receiving= false;
                   s_rec_bit-= bitclkmax;
 
-                  if (!(regs[sr]->get() & UART_SR_RXNE))
-                    regs[sr]->write_bit1(UART_SR_RXNE);
+                  if (!(sr->get() & UART_SR_RXNE))
+                    sr->write_bit1(UART_SR_RXNE);
                   else
-                    regs[sr]->write_bit1(UART_SR_OR);
+                    sr->write_bit1(UART_SR_OR);
                 }
             }
         }
@@ -335,10 +441,10 @@ cl_serial::tick(int cycles)
 
           if (input_avail)
             s_receiving= true;
-          else if (!(regs[sr]->get() & UART_SR_IDLE))
+          else if (!(sr->get() & UART_SR_IDLE))
             {
               s_rec_bit= 0;
-              regs[sr]->write_bit1(UART_SR_IDLE);
+              sr->write_bit1(UART_SR_IDLE);
             }
         }
 
@@ -351,11 +457,16 @@ cl_serial::tick(int cycles)
 void
 cl_serial::reset(void)
 {
-  int i;
   hw_updating++;
-  for (i= 2; i < 12; i++)
-    regs[i]->write(0);
-  regs[sr]->write(UART_SR_TXE | UART_SR_TC);
+
+  sr->write(UART_SR_TXE | UART_SR_TC);
+  dr->write(0);
+  brr1->write(0);
+  brr2->write(0);
+  cr1->write(0);
+  cr2->write(0);
+  cr3->write(0);
+
   hw_updating--;
 
   s_rec_bit= s_tr_bit= 0;
@@ -379,7 +490,7 @@ cl_serial::happen(class cl_hw *where, enum hw_event he,
 void
 cl_serial::print_info(class cl_console_base *con)
 {
-  con->dd_printf("%s[%d] at 0x%06x %s\n", id_string, id, base, ((regs[cr1]->get() & UART_CR1_UARTD) ? "off" : "on"));
+  con->dd_printf("%s[%d] at 0x%06x %s\n", id_string, id, base, ((cr1->get() & UART_CR1_UARTD) ? "off" : "on"));
   con->dd_printf("clk %s\n", clk_enabled?"enabled":"disabled");
   con->dd_printf("Input: ");
   class cl_f *fin= io->get_fin(), *fout= io->get_fout();

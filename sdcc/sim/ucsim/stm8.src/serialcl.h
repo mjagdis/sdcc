@@ -62,10 +62,18 @@ class cl_serial: public cl_serial_hw
   static const int UART_CR2_TIEN = 0x80;
 
  protected:
+  class cl_memory_cell
+    *sr,
+    *dr,
+    *brr1,
+    *brr2,
+    *cr1,
+    *cr2,
+    *cr3;
+
   bool clk_enabled;
   t_addr base;
-  int type, txit, rxit;
-  class cl_memory_cell *regs[12];
+  int txit, rxit;
   unsigned int sample_clk, sample_div;
   unsigned int uart_clk, uart_div;
   int hw_updating;	// >0 = hw writes, ==0 = app writes
@@ -80,7 +88,7 @@ class cl_serial: public cl_serial_hw
  public:
   cl_serial(class cl_uc *auc,
 	    t_addr abase,
-	    int ttype, int atxit, int arxit);
+	    int aid, int atxit, int arxit);
   virtual ~cl_serial(void);
   virtual int init(void);
   virtual int cfg_size(void) { return 10; }
