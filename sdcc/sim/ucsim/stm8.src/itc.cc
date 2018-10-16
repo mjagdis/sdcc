@@ -65,7 +65,7 @@ cl_itc::init(void)
   // use or expose them all. We only add vars for those that are
   // user-visible on this particular MCU.
   cl_var *v;
-  char name[] = "itc_spr1";
+  char name[] = "ITC_SPR1";
   char desc[] = "Software priority register 1";
   for (i= 0; i < 8; i++, name[7]++, desc[27]++)
     {
@@ -73,39 +73,39 @@ cl_itc::init(void)
       v->init();
     }
 
-    uc->vars->add(v= new cl_var("exti_cr1", uc->rom, 0x50a0,
+    uc->vars->add(v= new cl_var("EXTI_CR1", uc->rom, 0x50a0,
                                 "External interrupt control register 1", 7, 0));
     v->init();
-    uc->vars->add(v= new cl_var("exti_cr2", uc->rom, 0x50a1,
+    uc->vars->add(v= new cl_var("EXTI_CR2", uc->rom, 0x50a1,
                                 "External interrupt control register 2", 7, 0));
     v->init();
 
     if (uc->type->type == CPU_STM8L ||
         uc->type->type == CPU_STM8L101)
       {
-        uc->vars->add(v= new cl_var("exti_cr3", uc->rom, 0x50a2,
+        uc->vars->add(v= new cl_var("EXTI_CR3", uc->rom, 0x50a2,
                                     "External interrupt control register 3", 7, 0));
         v->init();
 
-        uc->vars->add(v= new cl_var("exti_sr1", uc->rom, 0x50a3,
+        uc->vars->add(v= new cl_var("EXTI_SR1", uc->rom, 0x50a3,
                                     "External interrupt status register 1", 7, 0));
         v->init();
-        uc->vars->add(v= new cl_var("exti_sr2", uc->rom, 0x50a4,
+        uc->vars->add(v= new cl_var("EXTI_SR2", uc->rom, 0x50a4,
                                     "External interrupt status register 2", 7, 0));
         v->init();
 
-        uc->vars->add(v= new cl_var("exti_conf", uc->rom, 0x50a5,
+        uc->vars->add(v= new cl_var("EXTI_CONF", uc->rom, 0x50a5,
                                     "External interrupt port select register", 7, 0));
         v->init();
       }
 
     if (uc->type->type == CPU_STM8L)
       {
-        uc->vars->add(v= new cl_var("exti_cr4", uc->rom, 0x50aa,
+        uc->vars->add(v= new cl_var("EXTI_CR4", uc->rom, 0x50aa,
                                     "External interrupt control register 4", 7, 0));
         v->init();
 
-        uc->vars->add(v= new cl_var("exti_conf2", uc->rom, 0x50ab,
+        uc->vars->add(v= new cl_var("EXTI_CONF2", uc->rom, 0x50ab,
                                     "External interrupt port select register 2", 7, 0));
         v->init();
       }

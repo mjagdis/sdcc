@@ -75,26 +75,28 @@ cl_port::init(void)
   cell_cr2= register_cell(uc->rom, base + 4);
 
   cl_var *v;
-  chars pn= cchars(get_name());
-  uc->vars->add(v= new cl_var(pn+chars("_odr"), uc->rom, base+0,
-			      "Output data register", 7, 0));
-  v->init();
-  uc->vars->add(v= new cl_var(pn+chars("_idr"), uc->rom, base+1,
-			      "Input data register (outside value of port pins)", 7, 0));
-  v->init();
+  chars pn= cchars(get_name()).uppercase();
   uc->vars->add(v= new cl_var(pn+chars("_pin"), uc->rom, base+1,
 			      "Outside value of port pins", 7, 0));
   v->init();
   uc->vars->add(v= new cl_var(pn+chars("_pins"), uc->rom, base+1,
 			      "Outside value of port pins", 7, 0));
   v->init();
-  uc->vars->add(v= new cl_var(pn+chars("_ddr"), uc->rom, base+2,
+
+  pn.uppercase();
+  uc->vars->add(v= new cl_var(pn+chars("_ODR"), uc->rom, base+0,
+			      "Output data register", 7, 0));
+  v->init();
+  uc->vars->add(v= new cl_var(pn+chars("_IDR"), uc->rom, base+1,
+			      "Input data register (outside value of port pins)", 7, 0));
+  v->init();
+  uc->vars->add(v= new cl_var(pn+chars("_DDR"), uc->rom, base+2,
 			      "Direction register", 7, 0));
   v->init();
-  uc->vars->add(v= new cl_var(pn+chars("_cr1"), uc->rom, base+3,
+  uc->vars->add(v= new cl_var(pn+chars("_CR1"), uc->rom, base+3,
 			      "Control register 1", 7, 0));
   v->init();
-  uc->vars->add(v= new cl_var(pn+chars("_cr2"), uc->rom, base+4,
+  uc->vars->add(v= new cl_var(pn+chars("_CR2"), uc->rom, base+4,
 			      "Control register 2", 7, 0));
   v->init();
 
