@@ -166,16 +166,16 @@ cl_st7::make_memories(void)
   address_spaces->add(regs16);
 
   class cl_var *v;
-  vars->add(v= new cl_var(cchars("A"), regs8, 0, ""));
+  vars->add(v= new cl_var(cchars("A"), regs8, 0, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("CC"), regs8, 1, ""));
+  vars->add(v= new cl_var(cchars("CC"), regs8, 1, "", 7, 0));
   v->init();
   
-  vars->add(v= new cl_var(cchars("X"), regs16, 0, ""));
+  vars->add(v= new cl_var(cchars("X"), regs16, 0, "", 15, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("Y"), regs16, 1, ""));
+  vars->add(v= new cl_var(cchars("Y"), regs16, 1, "", 15, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("SP"), regs16, 2, ""));
+  vars->add(v= new cl_var(cchars("SP"), regs16, 2, "", 15, 0));
   v->init();
 }
 

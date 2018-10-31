@@ -69,60 +69,9 @@ COMMAND_DO_WORK_UC(cl_set_mem_cmd)
 				 cmdline->param(2),
 				 cmdline->param(3) };
 
-  if (cmdline->syntax_match(uc, MEMORY ADDRESS DATALIST)) {
-    mem= params[0]->value.memory.memory;
-    t_addr start= params[1]->value.address;
-    t_mem *array= params[2]->value.data_list.array;
-    int len= params[2]->value.data_list.len;
-    
-    if (len == 0)
-      con->dd_printf("Error: no data\n");
-    else if (start < mem->get_start_address())
-      con->dd_printf("Start address less then 0x%x\n",
-		     AU(mem->get_start_address()));
-    else
-      {
-	int i;
-	t_addr addr;
-	for (i= 0, addr= start;
-	     i < len && mem->valid_address(addr);
-	     i++, addr++)
-	  mem->write(addr, array[i]);
-	uc->check_errors();
-	mem->dump(start, start+len-1, 8, con->get_fout());
-      }
-  }
-  else
-    syntax_error(con);
-  
-  return(false);;
-}
-
-CMDHELP(cl_set_mem_cmd,
-	"set memory memory_type address data...",
-	"Place list of data into memory",
-	"long help of set memory")
-
-/*
- * Command: set bit
- *----------------------------------------------------------------------------
- */
-
-//int
-//cl_set_bit_cmd::do_work(class cl_sim *sim,
-//			class cl_cmdline *cmdline, class cl_console *con)
-COMMAND_DO_WORK_UC(cl_set_bit_cmd)
-{
-  class cl_memory *mem;
-  t_addr mem_addr= 0;
-  class cl_cmd_arg *params[4]= { cmdline->param(0),
-				 cmdline->param(1),
-				 cmdline->param(2),
-				 cmdline->param(3) };
-  
   if (cmdline->syntax_match(uc, BIT NUMBER)) {
     mem= params[0]->value.bit.mem;
-    mem_addr= params[0]->value.bit.mem_address;
+    t_addr mem_addr= params[0]->value.bit.mem_address;
     if (params[0]->value.bit.bitnr_low >= 0)
       {
         t_mem mask= 0;
@@ -147,6 +96,29 @@ COMMAND_DO_WORK_UC(cl_set_bit_cmd)
     else
       con->dd_printf("].%u %c\n", bitnr_low, (m & (1U << bitnr_low)) ? '1' : '0');
   }
+  else if (cmdline->syntax_match(uc, MEMORY ADDRESS DATALIST)) {
+    mem= params[0]->value.memory.memory;
+    t_addr start= params[1]->value.address;
+    t_mem *array= params[2]->value.data_list.array;
+    int len= params[2]->value.data_list.len;
+    
+    if (len == 0)
+      con->dd_printf("Error: no data\n");
+    else if (start < mem->get_start_address())
+      con->dd_printf("Start address less then 0x%x\n",
+		     AU(mem->get_start_address()));
+    else
+      {
+	int i;
+	t_addr addr;
+	for (i= 0, addr= start;
+	     i < len && mem->valid_address(addr);
+	     i++, addr++)
+	  mem->write(addr, array[i]);
+	uc->check_errors();
+	mem->dump(start, start+len-1, 8, con->get_fout());
+      }
+  }
   else
     syntax_error(con);
 
@@ -154,8 +126,8 @@ COMMAND_DO_WORK_UC(cl_set_bit_cmd)
 }
 
 CMDHELP(cl_set_bit_cmd,
-	"set bit addr 0|1",
-	"Set specified bit to 0 or 1",
+	"set memory [memory_type address data...] | [bit data]",
+	"Place list of data into memory OR set specified bit(s) to data",
 	"long help of set bit")
 
 /*

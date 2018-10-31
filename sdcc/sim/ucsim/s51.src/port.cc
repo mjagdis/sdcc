@@ -111,23 +111,23 @@ cl_port::init(void)
 			      cfg_help(port_on)));
   v->init();
   uc->vars->add(v= new cl_var(pn+chars("pin"), cfg, port_pin,
-			      cfg_help(port_pin)));
+			      cfg_help(port_pin), 7, 0));
   v->init();
   uc->vars->add(v= new cl_var(pn+chars("pins"), cfg, port_pin,
-			      cfg_help(port_pin)));
+			      cfg_help(port_pin), 7, 0));
   v->init();
   uc->vars->add(v= new cl_var(pn+chars("value"), cfg, port_value,
-			      cfg_help(port_value)));
+			      cfg_help(port_value), 7, 0));
   v->init();
   chars p= chars("pin");
   p.append("%d", id);
   uc->vars->add(v= new cl_var(p, cfg, port_pin,
-			      cfg_help(port_pin)));
+			      cfg_help(port_pin), 7, 0));
   v->init();
   p= chars("pins");
   p.append("%d", id);
   uc->vars->add(v= new cl_var(p, cfg, port_pin,
-			      cfg_help(port_pin)));
+			      cfg_help(port_pin), 7, 0));
   v->init();
   
   return(0);

@@ -628,8 +628,6 @@ cl_uc::build_cmdset(class cl_cmdset *cmdset)
       cset->init();
     }
     cset->add(cmd= new cl_set_mem_cmd("memory", 0));
-    cmd->init();
-    cset->add(cmd= new cl_set_bit_cmd("bit", 0));
     cmd->add_name("bits");
     cmd->init();
     cset->add(cmd= new cl_set_hw_cmd("hardware", 0));

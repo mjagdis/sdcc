@@ -1077,13 +1077,13 @@ cl_51core::decode_dptr(void)
     }
   
   cl_var *v;
-  vars->add(v= new cl_var(chars("dpl"), dptr, 0, ""));
+  vars->add(v= new cl_var(chars("dpl"), dptr, 0, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(chars("DPL"), dptr, 0, ""));
+  vars->add(v= new cl_var(chars("DPL"), dptr, 0, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(chars("dph"), dptr, 1, ""));
+  vars->add(v= new cl_var(chars("dph"), dptr, 1, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(chars("DPH"), dptr, 1, ""));
+  vars->add(v= new cl_var(chars("DPH"), dptr, 1, "", 7, 0));
   v->init();
 }
 
@@ -1092,21 +1092,21 @@ cl_51core::make_vars(void)
 {
   cl_var *v;
 
-  vars->add(v= new cl_var(cchars("R0"), regs, 0, ""));
+  vars->add(v= new cl_var(cchars("R0"), regs, 0, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("R1"), regs, 1, ""));
+  vars->add(v= new cl_var(cchars("R1"), regs, 1, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("R2"), regs, 2, ""));
+  vars->add(v= new cl_var(cchars("R2"), regs, 2, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("R3"), regs, 3, ""));
+  vars->add(v= new cl_var(cchars("R3"), regs, 3, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("R4"), regs, 4, ""));
+  vars->add(v= new cl_var(cchars("R4"), regs, 4, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("R5"), regs, 5, ""));
+  vars->add(v= new cl_var(cchars("R5"), regs, 5, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("R6"), regs, 6, ""));
+  vars->add(v= new cl_var(cchars("R6"), regs, 6, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("R7"), regs, 7, ""));
+  vars->add(v= new cl_var(cchars("R7"), regs, 7, "", 7, 0));
   v->init();
 
   int i;
@@ -1116,7 +1116,7 @@ cl_51core::make_vars(void)
 	{
 	  vars->add(v= new cl_var(chars(sfr_tab51[i].name),
 				  sfr,
-				  sfr_tab51[i].addr, ""));
+				  sfr_tab51[i].addr, "", 7, 0));
 	  v->init();
 	}
     }
@@ -1126,7 +1126,7 @@ cl_51core::make_vars(void)
 	{
 	  vars->add(v= new cl_var(chars(bit_tab51[i].name),
 				  bits,
-				  bit_tab51[i].addr, ""));
+				  bit_tab51[i].addr, "", 7, 0));
 	  v->init();
 	}
     }
