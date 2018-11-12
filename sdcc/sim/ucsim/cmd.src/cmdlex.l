@@ -148,11 +148,10 @@ uc_yy_check_id(char *token)
 	}
       
       t_addr addr;
-      class cl_address_space *as;
       bool found;
-      if ((found= uc->symbol2address(yytext, &as, &addr)))
+      if ((found= uc->symbol2address(yytext, &mem, &addr)))
 	  {
-	      yylval.memory.memory= as;
+	      yylval.memory.memory= mem;
 	      yylval.memory.address= addr;
 	      return PTOK_MEMORY;
 	  }

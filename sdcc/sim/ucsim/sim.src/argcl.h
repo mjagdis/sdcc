@@ -59,7 +59,7 @@ public:
   virtual double get_fvalue(void);
   virtual void *get_pvalue(void);
   virtual bool get_bit_address(class cl_uc *uc, // input
-                               class cl_address_space **mem, // outputs
+                               class cl_memory **mem, // outputs
                                t_addr *mem_addr,
                                int *bitnr_high,
                                int *bitnr_low) { return(false); }
@@ -94,7 +94,7 @@ public:
       int len;
     } data_list;
     struct {
-      class cl_address_space *mem;
+      class cl_memory *mem;
       t_addr mem_address;
       int bitnr_high, bitnr_low;
     } bit;
@@ -127,7 +127,7 @@ public:
 
   virtual bool get_address(class cl_uc *uc, t_addr *addr);
   virtual bool get_bit_address(class cl_uc *uc, // input
-                               class cl_address_space **mem, // outputs
+                               class cl_memory **mem, // outputs
                                t_addr *mem_addr,
                                int *bitnr_high,
                                int *bitnr_low);
@@ -141,7 +141,7 @@ public:
 
   virtual bool get_address(class cl_uc *uc, t_addr *addr);
   virtual bool get_bit_address(class cl_uc *uc, // input
-                               class cl_address_space **mem, // outputs
+                               class cl_memory **mem, // outputs
                                t_addr *mem_addr,
                                int *bitnr_high,
                                int *bitnr_low);
@@ -172,7 +172,7 @@ public:
 
   virtual bool get_address(class cl_uc *uc, t_addr *addr);
   virtual bool get_bit_address(class cl_uc *uc, // input
-                               class cl_address_space **mem, // outputs
+                               class cl_memory **mem, // outputs
                                t_addr *mem_addr,
                                int *bitnr_high,
                                int *bitnr_low);
@@ -186,7 +186,7 @@ public:
 public:
   cl_cmd_array_arg(class cl_cmd_arg *aname, class cl_cmd_arg *aindex);
   virtual bool get_bit_address(class cl_uc *uc, // input
-                               class cl_address_space **mem, // outputs
+                               class cl_memory **mem, // outputs
                                t_addr *mem_addr,
                                int *bitnr_high,
                                int *bitnr_low);

@@ -958,6 +958,11 @@ cl_app::mk_options(void)
   options->new_option(o= new cl_bool_option(this, "echo_script",
 					    "Print breakpoint script before execute"));
   o->init();
+
+  options->new_option(o= new cl_number_option(this, "label_width",
+					      "Space to allow for labels in dumps and disassembly (-1 for auto)"));
+  o->init();
+  o->set_value((long)-1);
 }
 
 

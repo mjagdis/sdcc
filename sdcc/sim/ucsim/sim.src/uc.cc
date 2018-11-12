@@ -326,8 +326,8 @@ cl_uc::cl_uc(class cl_sim *asim):
   //int i;
   sim = asim;
   //mems= new cl_list(MEM_TYPES, 1);
-  memchips= new cl_list(2, 2, "memchips");
-  address_spaces= new cl_address_space_list(this);
+  memchips= new cl_memory_list(this, "memchips");
+  address_spaces= new cl_memory_list(this, "address_spaces");
   //address_decoders= new cl_list(2, 2);
   rom= 0;
 
@@ -1647,52 +1647,45 @@ cl_uc::longest_inst(void)
 }
 
 bool
-cl_uc::addr_name(t_addr addr, class cl_address_space *as, char *buf)
+cl_uc::addr_name(t_addr addr, class cl_address_space *as, int bitnr_high, int bitnr_low, char *buf)
 {
   t_index i;
   
-  for (i= 0; i < vars->count; i++)
+  if (vars->by_addr.search(as, addr, bitnr_high, bitnr_low, i))
     {
-      class cl_var *v= (cl_var *)(vars->at(i));
-      if ((v->as == as) &&
-	  (v->addr == addr) &&
-	  (v->bitnr_low < 0))
-	{
-	  strcpy(buf, v->get_name());
-	  return true;
-	}
+      class cl_var *v= (cl_var *)(vars->by_addr.at(i));
+      strcpy(buf, v->get_name());
+      return true;
     }
-  unsigned int a= addr;
-  sprintf(buf, "%02x", a);
+
+  //sprintf(buf, "%02lx[%d:%d]", (unsigned long)addr, bitnr_high, bitnr_low);
   return false;
 }
 
 bool
 cl_uc::addr_name(t_addr addr, class cl_address_space *as, int bitnr, char *buf)
 {
-  t_index i;
-  
-  for (i= 0; i < vars->count; i++)
-    {
-      class cl_var *v= (cl_var *)(vars->at(i));
-      if ((v->as == as) &&
-	  (v->addr == addr) &&
-	  (v->bitnr_low == bitnr) &&
-	  ((v->bitnr_high == bitnr) ||
-	   (v->bitnr_high < 0)))
-	{
-	  strcpy(buf, v->get_name());
-	  return true;
-	}
-    }
-  unsigned int a= addr;
-  sprintf(buf, "%02x.%d", a, bitnr);
-  return false;
+  bool ret;
+
+  if (!(ret = addr_name(addr, as, bitnr, bitnr, buf)))
+    sprintf(buf, "%02lx.%d", (unsigned long)addr, bitnr);
+  return ret;
+}
+
+bool
+cl_uc::addr_name(t_addr addr, class cl_address_space *as, char *buf)
+{
+  bool ret;
+
+  if (!(ret = addr_name(addr, as, as->width - 1, 0, buf)) &&
+      !(ret = addr_name(addr, as, -1, -1, buf)))
+    sprintf(buf, "%02lx", (unsigned long)addr);
+  return ret;
 }
 
 bool
 cl_uc::symbol2address(char *sym,
-		      class cl_address_space **as,
+		      class cl_memory **mem,
 		      t_addr *addr)
 {
   class cl_var *v;
@@ -1701,13 +1694,13 @@ cl_uc::symbol2address(char *sym,
   if (!sym ||
       !*sym)
     return false;
-  if (vars->search(sym, i))
+  if (vars->by_name.search(sym, i))
     {
-      v= (class cl_var *)(vars->at(i));
+      v= (class cl_var *)(vars->by_name.at(i));
       if (v->bitnr_low >= 0)
 	return false;
-      if (as)
-	*as= v->as;
+      if (mem)
+	*mem= v->mem;
       if (addr)
 	*addr= v->addr;
       return true;
@@ -1744,42 +1737,32 @@ cl_uc::get_name_entry(struct name_entry tabl[], char *name)
 }
 
 chars
-cl_uc::cell_name(class cl_memory_cell *cell, int bitnr_low, int bitnr_high)
+cl_uc::cell_name(class cl_memory_cell *cell, int bitnr_high, int bitnr_low)
 {
-  const char *s;
-  if (cell == NULL)
+  class cl_address_space *as;
+  t_addr addr;
+  int i;
+
+  if (!cell || !(as = address_space(cell, &addr)))
     return chars("");
-  if ((s= vars->cell_name(cell, bitnr_low, bitnr_high)))
-    return chars(s);
-  if (bitnr_low != -1 && (s= vars->cell_name(cell, -1, -1)))
+
+  if (vars->by_addr.search(as, addr, bitnr_high, bitnr_low, i))
+    return chars(vars->by_addr.at(i)->get_name());
+
+  if (bitnr_high != - 1 && vars->by_addr.search(as, addr, -1, -1, i))
     {
       if (bitnr_high != bitnr_low)
-        return chars("", "%s[%d:%d]", s, bitnr_high, bitnr_low);
+        return chars("", "%s[%d:%d]", vars->by_addr.at(i)->get_name(), bitnr_high, bitnr_low);
       else
-        return chars("", "%s.%d", s, bitnr_low);
+        return chars("", "%s.%d", vars->by_addr.at(i)->get_name(), bitnr_low);
     }
-  t_addr a;
-  class cl_address_space *as= address_space(cell, &a);
-  if (as == NULL)
-    return chars("");
-  if (bitnr_low == -1)
-    return chars("", "%s_%06x", as->get_name(), a);
-  else if (bitnr_high != bitnr_low)
-    return chars("", "%s_%06x[%d:%d]", as->get_name(), a, bitnr_high, bitnr_low);
-  else
-    return chars("", "%s_%06x.%d", as->get_name(), a, bitnr_low);
-}
 
-class cl_var *
-cl_uc::var(char *nam)
-{
-  if (!vars)
-    return NULL;
-  t_index i;
-  if (!vars->search(nam, i))
-    return NULL;
-  class cl_var *v= (cl_var*)(vars->at(i));
-  return v;
+  if (bitnr_high == -1)
+    return chars("", "%s_%06x", as->get_name(), addr);
+  else if (bitnr_high != bitnr_low)
+    return chars("", "%s_%06x[%d:%d]", as->get_name(), addr, bitnr_high, bitnr_low);
+  else
+    return chars("", "%s_%06x.%d", as->get_name(), addr, bitnr_high);
 }
 
 

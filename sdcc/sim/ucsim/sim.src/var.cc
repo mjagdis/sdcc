@@ -30,10 +30,10 @@
 #include "varcl.h"
 
 
-cl_var::cl_var(const char *iname, class cl_address_space *ias, t_addr iaddr, chars adesc, int ibitnr_high, int ibitnr_low):
+cl_var::cl_var(const char *iname, class cl_memory *imem, t_addr iaddr, chars adesc, int ibitnr_high, int ibitnr_low):
   cl_base()
 {
-  as= ias;
+  mem= imem;
   addr= iaddr;
   if (ibitnr_low < ibitnr_high)
     {
@@ -55,11 +55,11 @@ cl_var::cl_var(const char *iname, class cl_address_space *ias, t_addr iaddr, cha
 int
 cl_var::init(void)
 {
-  if (!as ||
-      !as->is_address_space() ||
-      !as->valid_address(addr))
+  if (!mem ||
+      !mem->is_address_space() ||
+      !mem->valid_address(addr))
     return 0;
-  cell= as->get_cell(addr);
+  cell= ((cl_address_space *)mem)->get_cell(addr);
   if (cell)
     cell->set_flag(CELL_VAR, true);
   return 0;
@@ -72,19 +72,18 @@ cl_var::print_info(cl_console_base *con)
   con->dd_printf("%s ", get_name("?"));
   if (cell)
     {
-      con->dd_printf("%s", as->get_name("?"));
+      con->dd_printf("%s", mem->get_name("?"));
       con->dd_printf("[");
-      con->dd_printf(as->addr_format, addr);
+      con->dd_printf(mem->addr_format, addr);
       con->dd_printf("]");
-      t_mem m= cell->get();
-      if (bitnr_low >= 0)
+      t_mem m= mem->get(addr);
+      if (bitnr_high >= 0)
         {
           if (bitnr_high >= 0 && bitnr_high != bitnr_low)
             {
               con->dd_printf("[%u:%u] = 0b", bitnr_high, bitnr_low);
               for (int i= bitnr_high; i >= bitnr_low; i--)
                 con->dd_printf("%c", (m & (1U << i)) ? '1' : '0');
-              con->dd_printf("\n");
             }
           else
             con->dd_printf(".%u = %c", bitnr_low, (m & (1U << bitnr_low)) ? '1' : '0');
@@ -92,7 +91,7 @@ cl_var::print_info(cl_console_base *con)
       else
         {
           con->dd_printf(" = ");
-          con->dd_printf(as->data_format, m);
+          con->dd_printf(mem->data_format, m);
         }
     }
   con->dd_printf("\n");
@@ -101,15 +100,19 @@ cl_var::print_info(cl_console_base *con)
 }
 
 
+cl_var_by_name_list::~cl_var_by_name_list(void)
+{
+}
+
 void *
-cl_var_list::key_of(void *item)
+cl_var_by_name_list::key_of(void *item)
 {
   class cl_var *v= (class cl_var *)item;
   return (void*)v->get_name();
 }
 
 int
-cl_var_list::compare(void *key1, void *key2)
+cl_var_by_name_list::compare(void *key1, void *key2)
 {
   char *k1, *k2;
 
@@ -121,31 +124,87 @@ cl_var_list::compare(void *key1, void *key2)
 }
 
 
-struct cell_name_matcher_args {
-  class cl_memory_cell *cell;
-  int bitnr_high;
-  int bitnr_low;
-};
-
-static int
-cell_name_matcher(void *a, void *b)
+cl_var_by_addr_list::~cl_var_by_addr_list(void)
 {
-  class cl_var *v = (class cl_var *)a;
-  struct cell_name_matcher_args *args = (struct cell_name_matcher_args *)b;
-  return (v->get_cell() == args->cell && v->bitnr_low == args->bitnr_low && v->bitnr_high == args->bitnr_high);
 }
 
-const char *
-cl_var_list::cell_name(class cl_memory_cell *cell, int bitnr_high, int bitnr_low)
+int
+cl_var_by_addr_list::compare_addr(class cl_var *var, class cl_memory *mem, t_addr addr, int bitnr_high, int bitnr_low)
 {
-  if (cell->get_flag(CELL_VAR))
+  int ret;
+
+  if (!(ret = (var->mem - mem)) &&
+     (!(ret = var->addr - addr)) &&
+     (!(ret = (var->bitnr_high < 0
+               ? (bitnr_high < 0 ? 0 : -1)
+               : (bitnr_high < 0
+                  ? 1
+                  : bitnr_high - var->bitnr_high)))))
+    ret = (var->bitnr_low < 0
+           ? (bitnr_low < 0 ? 0 : -1)
+           : (bitnr_low < 0
+              ? 1
+              : var->bitnr_low - bitnr_low));
+
+  return ret;
+}
+
+int
+cl_var_by_addr_list::compare(void *key1, void *key2)
+{
+  class cl_var *k1 = (cl_var *)key1;
+  class cl_var *k2 = (cl_var *)key2;
+  int ret;
+
+  // An addr may have multiple names as long as they are all different.
+  if (!(ret = compare_addr(k1, k2->mem, k2->addr, k2->bitnr_high, k2->bitnr_low)))
+    ret = strcmp(k1->get_name(), k2->get_name());
+
+  return ret;
+}
+
+bool
+cl_var_by_addr_list::search(class cl_memory *mem, t_addr addr, int bitnr_high, int bitnr_low, t_index &index)
+{
+  t_index l  = 0;
+  t_index h  = count - 1;
+  bool    res= false;
+
+  while (l <= h)
     {
-      struct cell_name_matcher_args args = { .cell = cell, .bitnr_high = bitnr_high, .bitnr_low = bitnr_low };
-      class cl_var *v = (cl_var *)first_that(cell_name_matcher, &args);
-      if (v)
-        return v->get_name();
+      t_index i= (l + h) >> 1;
+      t_index c= compare_addr((cl_var *)key_of(Items[i]), mem, addr, bitnr_high, bitnr_low);
+      if (c < 0) l= i + 1;
+      else
+        {
+          h= i - 1;
+          if (c == 0)
+            {
+              res= true;
+              // We want the _first_ name for the given addr.
+              for (l = i; l > 0 && !compare_addr((cl_var *)key_of(Items[l-1]), mem, addr, bitnr_high, bitnr_low); l--);
+            }
+        }
     }
-  return NULL;
+
+  index= l;
+  return(res);
+}
+
+void
+cl_var_list::add(cl_var *item)
+{
+  const char *name = item->get_name();
+
+  if (name)
+    {
+      int l = strlen(name);
+      if (l > max_name_len)
+        max_name_len = l;
+    }
+
+  by_name.add(item);
+  by_addr.add(item);
 }
 
 

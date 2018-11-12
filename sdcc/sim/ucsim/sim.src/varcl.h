@@ -41,14 +41,15 @@
 class cl_var: public cl_base
 {
  public:
-  class cl_address_space *as; // reference
+  class cl_memory *mem;
   t_addr addr;
   int bitnr_high, bitnr_low;
+  int instance;
   chars desc;
  protected:
   class cl_memory_cell *cell;
  public:
-  cl_var(const char *iname, class cl_address_space *ias, t_addr iaddr, chars adesc, int ibitnr_high= -1, int ibitnr_low= -1);
+  cl_var(const char *iname, class cl_memory *imem, t_addr iaddr, chars adesc, int ibitnr_high= -1, int ibitnr_low= -1);
   virtual int init(void);
   virtual class cl_memory_cell *get_cell(void) { return cell; }
   
@@ -56,14 +57,41 @@ class cl_var: public cl_base
 };
 
 
-class cl_var_list: public cl_sorted_list
+class cl_var_by_name_list: public cl_sorted_list
 {
  public:
- cl_var_list(): cl_sorted_list(10, 10, "symlist") {}
- public:
+  cl_var_by_name_list(): cl_sorted_list(10, 10, "symlist") {}
+  virtual ~cl_var_by_name_list(void);
+
+  virtual class cl_var *at(t_index index) { return (cl_var *)cl_sorted_list::at(index); }
   virtual void *key_of(void *item);
   virtual int compare(void *key1, void *key2);
-  virtual const char *cell_name(class cl_memory_cell *cell, int bitnr_high, int bitnr_low);
+};
+
+class cl_var_by_addr_list: public cl_sorted_list
+{
+ public:
+  cl_var_by_addr_list(): cl_sorted_list(10, 10, "symlist_by_addr") {}
+  virtual ~cl_var_by_addr_list(void);
+
+  virtual class cl_var *at(t_index index) { return (cl_var *)cl_sorted_list::at(index); }
+  virtual int compare_addr(class cl_var *var, class cl_memory *mem, t_addr addr, int bitnr_high, int bitnr_low);
+  virtual int compare(void *key1, void *key2);
+  virtual bool search(class cl_memory *mem, t_addr addr, int bitnr_high, int bitnr_low, t_index &index);
+};
+
+class cl_var_list: public cl_base
+{
+ private:
+  int max_name_len = 0;
+ public:
+  class cl_var_by_name_list by_name;
+  class cl_var_by_addr_list by_addr;
+
+  cl_var_list() {}
+
+  virtual void add(cl_var *item);
+  virtual int get_max_name_len(void) { return max_name_len; }
 };
 
 

@@ -179,11 +179,36 @@ cl_memory::err_non_decoded(t_addr addr)
   uc->error(e);
 }
 
+class cl_var *
+cl_memory::var_for(t_addr addr, int bitnr_high, int bitnr_low, t_index &var_i)
+{
+  class cl_var *var = NULL;
+
+  if (uc->vars->by_addr.search(this, addr, bitnr_high, bitnr_low, var_i) ||
+      uc->vars->by_addr.search(this, addr, width - 1, 0, var_i) ||
+      (bitnr_high >= 0 && uc->vars->by_addr.search(this, addr, -1, -1, var_i)))
+    var = uc->vars->by_addr.at(var_i);
+
+  return var;
+}
 
 t_addr
-cl_memory::dump(t_addr start, t_addr stop, int bpl, class cl_f *f)
+cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_low, int bpl, class cl_f *f)
 {
-  int i, step;
+  if (!f)
+    return dump_finished;
+
+  if (!is_address_space())
+    smart = 0;
+
+  if (bpl < 0)
+    bpl= 8;
+
+  if (start < 0)
+    start= dump_finished;
+  if (stop < 0)
+    stop= start + 10*bpl - 1;
+
   t_addr lva= lowest_valid_address();
   t_addr hva= highest_valid_address();
 
@@ -195,6 +220,8 @@ cl_memory::dump(t_addr start, t_addr stop, int bpl, class cl_f *f)
     stop= hva;
   if (stop < lva)
     return dump_finished;
+
+  int i, step;
   if (stop >= start)
     {
       step= +1;
@@ -209,33 +236,174 @@ cl_memory::dump(t_addr start, t_addr stop, int bpl, class cl_f *f)
       if (start - bpl < stop)
         bpl= start - stop;
     }
+
+  long label_width = -1;
+  cl_option *o = application->options->get_option("label_width");
+  if (o)
+    o->get_value(&label_width);
+  if (label_width < 0)
+    label_width = uc->vars->get_max_name_len();
+
+  t_index var_i;
+  class cl_var *var = var_for(start, bitnr_high, bitnr_low, var_i);
+  class cl_var *var_next = NULL;
+
   while ((step>0)?(start < stop):(start > stop))
     {
-      f->prntf(addr_format, start); f->write_str(" ");
-      for (i= 0;
-           (i < bpl) &&
-             (start+i*step >= lva) &&
-             (start+i*step <= hva) &&
-             (start+i*step != stop);
-           i++)
+      int n;
+
+      if (smart && this != uc->rom)
+        f->prntf("%s[", get_name("?"));
+      f->prntf(addr_format, start);
+      if (smart && this != uc->rom)
+        f->write_str("]");
+
+      if (smart)
         {
-          f->prntf(data_format, read/*get*/(start+i*step)); f->write_str(" ");
+          if (bitnr_high >= 0 && bitnr_high == bitnr_low)
+            f->prntf(".%d   ", bitnr_high);
+          else if (bitnr_low > 0 || (bitnr_high > 0 && bitnr_high < width - 1))
+            f->prntf("[%d:%d]", bitnr_high, bitnr_low);
+          else if (smart == 2)
+            f->write_str("     ");
+
+          if (var)
+            {
+              // If we asked for specific bits but got a label or all-bits register we
+              // need to qualify the var.
+              if (bitnr_high >= 0 &&
+                  (var->bitnr_high < 0 ||
+                   (var->bitnr_high == width - 1 && var->bitnr_low == 0)))
+                {
+                  if (bitnr_high >= 0 && bitnr_high == bitnr_low)
+                    f->prntf(" %s.%d:   %*s", var->get_name(), bitnr_high, label_width - strlen(var->get_name()), "");
+                  else if (bitnr_low > 0 || (bitnr_high > 0 && bitnr_high < width - 1))
+                    f->prntf(" %s[%d:%d]:%*s", var->get_name(), bitnr_high, bitnr_low, label_width - strlen(var->get_name()), "");
+                  else
+                    f->prntf(" %s:%*s", var->get_name(), label_width - strlen(var->get_name()) + (smart == 2 ? 5 : 0), "");
+                }
+              else
+                f->prntf(" %s:%*s", var->get_name(), label_width - strlen(var->get_name()) + (smart == 2 ? 5 : 0), "");
+
+              // If the next var matches we do not need to output data now.
+              if (++var_i < uc->vars->by_addr.count)
+                {
+                  if ((var_next = uc->vars->by_addr.at(var_i)) &&
+                      var_next->mem == this &&
+                      var_next->addr == var->addr &&
+                      ((var_next->bitnr_high == bitnr_high && var_next->bitnr_low == bitnr_low) ||
+                       (bitnr_high < 0 && var_next->bitnr_high == width - 1 && var_next->bitnr_low == 0)))
+                    {
+                      f->write_str("\n");
+                      var = var_next;
+                      var_next = NULL;
+                      continue;
+                    }
+                }
+            }
+          else
+            f->prntf(" %-*s %s", label_width, "", (smart == 2 ? "     " : ""));
+
+          if (smart == 2 || (var && var->bitnr_high >= 0))
+            {
+              int b_high, b_low;
+
+              if (var && var->bitnr_high >= 0)
+                {
+                  b_high = (bitnr_high < 0 || var->bitnr_high < bitnr_high ? var->bitnr_high : bitnr_high);
+                  b_low = (bitnr_low < 0 || var->bitnr_low > bitnr_low ? var->bitnr_low : bitnr_low);
+                }
+              else if (bitnr_high >= 0)
+                b_high = bitnr_high, b_low = bitnr_low;
+              else
+                b_high = width - 1, b_low = 0;
+
+              f->write_str(" ");
+
+              t_mem m= read(start);
+
+              int i;
+              f->write_str("0b");
+              for (i= width - 1; i > b_high; i--)
+                f->write_str("-");
+              for (; i >= b_low; i--)
+                f->prntf("%c", (m & (1U << i)) ? '1' : '0');
+              for (; i >= 0; i--)
+                f->write_str("-");
+
+              int nbits = b_high - b_low + 1;
+
+              m = (m >> b_low) & ((1U << nbits) - 1);
+
+              f->prntf(" 0x%0*x", (nbits > 16 ? 8 : (nbits > 8 ? 4 : 2)), m);
+
+              f->write_str(" '");
+              for (int i= (nbits - 1) - ((nbits - 1) % 8); i >= 0; i -= 8)
+                f->prntf("%c", (isprint(m >> i) ? m >> i : '.'));
+              f->write_str("'");
+
+              f->prntf(" %*u", (nbits > 16 ? 10 : (nbits > 8 ? 5 : 3)), m);
+
+              if ((m & (1U << (nbits - 1))))
+                f->prntf(" (%*d)", (nbits > 16 ? 10 : (nbits > 8 ? 5 : 3)), 0 - ((1U << nbits) - m));
+
+              f->write_str("\n");
+
+              // Only advance if there is no more to say about this location.
+              var = NULL;
+              while (var_i < uc->vars->by_addr.count)
+                {
+                  if ((var_next = uc->vars->by_addr.at(var_i)) &&
+                      var_next->mem == this && var_next->addr == start &&
+                      (bitnr_high < 0 ||
+                       (var_next->bitnr_high <= bitnr_high && var_next->bitnr_low >= bitnr_low)))
+                    {
+                      var = var_next;
+                      break;
+                    }
+                  var_i++;
+                }
+
+              if (!var)
+                {
+                  start += step;
+                  dump_finished= start;
+                  var = var_for(start, bitnr_high, bitnr_low, var_i);
+                }
+              continue;
+            }
+          else
+            ; // Not bit-formatted so drop through to normal output.
         }
-      while (i < bpl)
+
+      f->write_str(" ");
+
+      for (n= 0;
+           (n < bpl) &&
+             (start+n*step >= lva) &&
+             (start+n*step <= hva) &&
+             (start+n*step != stop);
+           n++)
         {
-	  int j;
-	  j= width/4 + ((width%4)?1:0) + 1;
-	  while (j)
-	    {
-	      f->write_str(" ");
-	      j--;
-	    }
-          i++;
+          if (smart && n)
+            {
+              var= var_for(start+n*step, bitnr_high, bitnr_low, var_i);
+              if (var)
+                break;
+            }
+          f->prntf(data_format, get(start+n*step)); f->write_str(" ");
         }
-      for (i= 0; (i < bpl) &&
-             (start+i*step >= lva) &&
-             (start+i*step <= hva) &&
-             (start+i*step != stop);
+      for (i= n; i < bpl; i++)
+        {
+          for (int j= width/4 + ((width%4)?1:0) + 1; j; j--)
+            f->write_str(" ");
+        }
+      if (!smart && n)
+        f->write_str(" ");
+      for (i= 0; i < n &&
+             start+i*step >= lva &&
+             start+i*step <= hva &&
+             start+i*step != stop;
            i++)
         {
           long c= read(start+i*step);
@@ -248,9 +416,11 @@ cl_memory::dump(t_addr start, t_addr stop, int bpl, class cl_f *f)
             f->prntf("%c", isprint(255&(c>>24))?(255&(c>>24)):'.');
         }
       f->prntf("\n");
-      dump_finished= start+i*step;
-      start+= i*step;
+
+      start+= n*step;
+      dump_finished= start;
     }
+
   return(dump_finished);
 }
 
@@ -260,24 +430,6 @@ cl_memory::dump_s(t_addr start, t_addr stop, int bpl, class cl_f *f)
   t_addr lva= lowest_valid_address();
   t_addr hva= highest_valid_address();
 
-  if (!f)
-    return dump_finished;
-  if (start < 0)
-    start= dump_finished;
-  if (stop < 0)
-    stop= start + 10*8 - 1;
-  
-  if (start < lva)
-    start= lva;
-  if (start > hva)
-    return dump_finished;
-  if (stop > hva)
-    stop= hva;
-  if (stop < lva)
-    return dump_finished;
-  
-  if (bpl < 0)
-    bpl= 8;
   t_addr a= start;
   t_mem d= read(a);
   char last= '\n';
@@ -304,24 +456,6 @@ cl_memory::dump_b(t_addr start, t_addr stop, int bpl, class cl_f *f)
   t_addr lva= lowest_valid_address();
   t_addr hva= highest_valid_address();
 
-  if (!f)
-    return dump_finished;
-  if (start < 0)
-    start= dump_finished;
-  if (stop < 0)
-    stop= start + 10*8 - 1;
-
-  if (start < lva)
-    start= lva;
-  if (start > hva)
-    return dump_finished;
-  if (stop > hva)
-    stop= hva;
-  if (stop < lva)
-    return dump_finished;
-
-  if (bpl < 0)
-    bpl= 8;
   t_addr a= start;
   t_mem d= read(a);
   while ((a <= stop) &&
@@ -345,14 +479,8 @@ cl_memory::dump_i(t_addr start, t_addr stop, int bpl, class cl_f *f)
   unsigned int sum;
   t_addr start_line;
   
-  if (!f)
-    return dump_finished;
-  if (start < 0)
-    start= dump_finished;
   if (start < lva)
     start= lva;
-  if (stop < 0)
-    stop= start + 10*8 - 1;
   if (stop > hva)
     stop= hva;
 
@@ -367,9 +495,6 @@ cl_memory::dump_i(t_addr start, t_addr stop, int bpl, class cl_f *f)
   
   if (start > stop)
     return dump_finished= stop;
-  
-  if (bpl < 0)
-    bpl= 16;
   if (bpl > 32)
     bpl= 32;
   t_addr a= start;
@@ -409,52 +534,6 @@ cl_memory::dump_i(t_addr start, t_addr stop, int bpl, class cl_f *f)
     }
   f->write_str(":00000001FF\r\n");
   return dump_finished= a;
-}
-
-t_addr
-cl_memory::dump(class cl_f *f)
-{
-  return(dump(dump_finished, dump_finished+10*8-1, 8, f));
-}
-
-t_addr
-cl_memory::dump(enum dump_format fmt,
-		t_addr start, t_addr stop, int bpl,
-		class cl_f *f)
-{
-  t_addr lva= lowest_valid_address();
-  t_addr hva= highest_valid_address();
-
-  if (start < 0)
-    start= dump_finished;
-  if (stop < 0)
-    stop= start + 10*8 - 1;
-
-  if (start < lva)
-    start= lva;
-  if (start > hva)
-    return dump_finished;
-  if (stop > hva)
-    stop= hva;
-  if (stop < lva)
-    return dump_finished;
-  
-  if (bpl < 0)
-    bpl= 8;
-  switch (fmt & df_format)
-    {
-    case df_hex:
-      return dump(start, stop, bpl, f);
-    case df_string:
-      return dump_s(start, stop, bpl, f);
-    case df_ihex:
-      return dump_i(start, stop, bpl, f);
-    case df_binary:
-      return dump_b(start, stop, bpl, f);
-    default:
-      return dump(start, stop, bpl, f);
-    }
-  return dump_finished;
 }
 
 bool
@@ -1750,20 +1829,20 @@ cl_address_space::print_info(chars pre, class cl_console_base *con)
  * List of address spaces
  */
 
-cl_address_space_list::cl_address_space_list(class cl_uc *the_uc):
-  cl_list(2, 2, "address spaces")
+cl_memory_list::cl_memory_list(class cl_uc *the_uc, const char *name):
+  cl_list(2, 2, name)
 {
   uc= the_uc;
 }
 
 t_index
-cl_address_space_list::add(class cl_address_space *mem)
+cl_memory_list::add(class cl_memory *mem)
 {
-  mem->set_uc(uc);
   t_index ret= cl_list::add(mem);
-  if (uc)
+  mem->set_uc(uc);
+  if (uc && mem->is_address_space())
     {
-      class cl_event_address_space_added e(mem);
+      class cl_event_address_space_added e((cl_address_space *)mem);
       uc->handle_event(e);
     }
   return(ret);

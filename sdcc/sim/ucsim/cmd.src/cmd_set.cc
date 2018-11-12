@@ -64,69 +64,74 @@ set_set_help(class cl_cmd *cmd)
 COMMAND_DO_WORK_UC(cl_set_mem_cmd)
 {
   class cl_memory *mem= 0;
+  t_addr start;
+  t_mem *array;
+  int len;
+  int bitnr_low= -1, bitnr_high= -1;
   class cl_cmd_arg *params[4]= { cmdline->param(0),
 				 cmdline->param(1),
-				 cmdline->param(2),
-				 cmdline->param(3) };
+				 cmdline->param(2) };
 
-  if (cmdline->syntax_match(uc, BIT NUMBER)) {
-    mem= params[0]->value.bit.mem;
-    t_addr mem_addr= params[0]->value.bit.mem_address;
-    if (params[0]->value.bit.bitnr_low >= 0)
-      {
-        t_mem mask= 0;
-        for (int i= params[1]->value.bit.bitnr_low; i <= params[0]->value.bit.bitnr_high; mask |= 1U << i++);
-        mem->set(mem_addr, (mem->get(mem_addr) & (~mask)) | ((params[1]->value.number << params[0]->value.bit.bitnr_low) & mask));
-      }
-    else
-        mem->set(mem_addr, params[1]->value.number);
+  if (cmdline->syntax_match(uc, BIT DATALIST))
+    {
+      mem= params[0]->value.bit.mem;
+      start= params[0]->value.bit.mem_address;
+      bitnr_low= params[0]->value.bit.bitnr_low;
+      bitnr_high= params[0]->value.bit.bitnr_high;
+      array= params[1]->value.data_list.array;
+      len= params[1]->value.data_list.len;
+    }
+  else if (cmdline->syntax_match(uc, MEMORY ADDRESS DATALIST))
+    {
+      mem= params[0]->value.memory.memory;
+      start= params[1]->value.address;
+      array= params[2]->value.data_list.array;
+      len= params[2]->value.data_list.len;
+    }
 
-    con->dd_printf("%s[", mem->get_name("?"));
-    con->dd_printf(mem->addr_format, mem_addr);
-    t_mem m= mem->get(mem_addr);
-    int bitnr_low= params[0]->value.bit.bitnr_low;
-    int bitnr_high= params[0]->value.bit.bitnr_high;
-    if (bitnr_high >= 0 && bitnr_high != bitnr_low)
-      {
-        con->dd_printf("][%u:%u] 0b", bitnr_high, bitnr_low);
-        for (int i= bitnr_high; i >= bitnr_low; i--)
-          con->dd_printf("%c", (m & (1U << i)) ? '1' : '0');
-        con->dd_printf("\n");
-      }
-    else
-      con->dd_printf("].%u %c\n", bitnr_low, (m & (1U << bitnr_low)) ? '1' : '0');
-  }
-  else if (cmdline->syntax_match(uc, MEMORY ADDRESS DATALIST)) {
-    mem= params[0]->value.memory.memory;
-    t_addr start= params[1]->value.address;
-    t_mem *array= params[2]->value.data_list.array;
-    int len= params[2]->value.data_list.len;
-    
-    if (len == 0)
-      con->dd_printf("Error: no data\n");
-    else if (start < mem->get_start_address())
-      con->dd_printf("Start address less then 0x%x\n",
-		     AU(mem->get_start_address()));
-    else
-      {
-	int i;
-	t_addr addr;
-	for (i= 0, addr= start;
-	     i < len && mem->valid_address(addr);
-	     i++, addr++)
-	  mem->write(addr, array[i]);
-	uc->check_errors();
-	mem->dump(start, start+len-1, 8, con->get_fout());
-      }
-  }
+  if (mem)
+    {
+      if (len == 0)
+        con->dd_printf("Error: no data\n");
+      else if (start < mem->get_start_address())
+        {
+          con->dd_printf("Start address less than ");
+          con->dd_printf(mem->addr_format, mem->get_start_address());
+          con->dd_printf("\n");
+        }
+      else if (bitnr_low >= 0)
+        {
+          if (len > 1)
+            con->dd_printf("Error: excess data for bit(s)\n");
+          else
+            {
+              t_mem mask= 0;
+              for (int i= bitnr_low; i <= bitnr_high; mask |= 1U << i++);
+              mem->write(start, (mem->get(start) & (~mask)) | ((array[0] << bitnr_low) & mask));
+              uc->check_errors();
+              mem->dump(start, bitnr_high, bitnr_low, con->get_fout());
+            }
+        }
+      else
+        {
+          int i;
+          t_addr addr;
+          for (i= 0, addr= start;
+               i < len && mem->valid_address(addr);
+               i++, addr++)
+            mem->write(addr, array[i]);
+          uc->check_errors();
+          mem->dump(start, start+len-1, 8, con->get_fout());
+        }
+    }
   else
     syntax_error(con);
-
-  return(false);;
+  
+  return(false);
 }
 
-CMDHELP(cl_set_bit_cmd,
-	"set memory [memory_type address data...] | [bit data]",
+CMDHELP(cl_set_mem_cmd,
+	"set memory memory_type address data... | bit data",
 	"Place list of data into memory OR set specified bit(s) to data",
 	"long help of set bit")
 

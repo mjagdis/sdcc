@@ -244,12 +244,12 @@ COMMAND_DO_WORK_UC(cl_info_var_cmd)
 	  !*s)
 	s= NULL;
     }
-  for (i= 0; i < uc->vars->count; i++)
+  for (i= 0; i < uc->vars->by_name.count; i++)
     {
-      v= (class cl_var *)(uc->vars->at(i));
+      v= uc->vars->by_name.at(i);
       if ((s == NULL) ||
 	  (
-	   (strstr(v->as->get_name(), s) != NULL) ||
+	   (strstr(v->mem->get_name(), s) != NULL) ||
 	   (strstr(v->get_name(), s) != NULL)
 	   )
 	  )
