@@ -814,53 +814,65 @@ cl_stm8::get_disasm_info(t_addr addr,
   return b;
 }
 
-char *
-cl_stm8::disass(t_addr addr, const char *sep)
+void
+cl_stm8::disass(class cl_console_base *con, t_addr addr, const char *sep)
 {
-  char work[256] = "";
   const char *b;
-  char *buf, *p, *t;
   int len = 0;
   int immed_offset = 0;
 
-  p = work;
-  if (addr_name(addr, rom, work))
-    {
-      p += strlen(work);
-      *(p++) = ':';
-    }
+  t_index i;
 
-  while (p - work < 16)
-    *(p++) = ' ';
+  if (vars->by_addr.search(rom, addr, -1, -1, i))
+    {
+      class cl_var *v= (cl_var *)(vars->by_addr.at(i));
+      con->dd_printf("%s:%*s", v->get_name(), 15 - strlen(v->get_name()), "");
+    }
+  else
+    con->dd_printf("%16s", "");
 
   b = get_disasm_info(addr, &len, NULL, &immed_offset, NULL);
 
   if (b == NULL) {
-    buf= (char*)malloc(30);
-    strcpy(buf, "UNKNOWN/INVALID");
-    return(buf);
+    con->dd_printf("UNKNOWN/INVALID");
+    return;
   }
 
-  while (*b)
+  // Output everything up to the first space then pad.
+  for (i= 0; b[i]; i++)
     {
-      if (*b == '%')
+      if (b[i] == ' ')
+        {
+          con->dd_printf("%-*.*s", i, i, b);
+          if (sep)
+            con->dd_printf("%s", sep);
+          else
+            con->dd_printf("%*s", 6 - i, "");
+          b= &b[i + 1];
+          break;
+        }
+    }
+
+  for (; *b; b++)
+    {
+      if (b[0] == '%' && b[1])
         {
           t_addr operand;
 
           b++;
-          switch (*(b++))
+          switch (*b)
             {
             case 's': // s    signed byte immediate
-              sprintf(p, "#%d", (char)rom->get(addr+immed_offset));
+              con->dd_printf("#%d", (char)rom->get(addr+immed_offset));
               ++immed_offset;
               break;
             case 'e': // e    extended 24bit immediate operand
               operand= ((rom->get(addr+immed_offset)<<16) |
                         (rom->get(addr+immed_offset+1)<<8) |
                         (rom->get(addr+immed_offset+2)));
-              p[0] = '#';
-              if (!addr_name(operand, rom, &p[1]))
-                sprintf(&p[1], "0x%06lx", operand);
+              con->dd_printf("#");
+              if (!addr_name(con, rom, operand))
+                con->dd_printf("0x%06lx", operand);
               ++immed_offset;
               ++immed_offset;
               ++immed_offset;
@@ -868,36 +880,36 @@ cl_stm8::disass(t_addr addr, const char *sep)
             case 'w': // w    word immediate operand
               operand= ((rom->get(addr+immed_offset)<<8) |
                         (rom->get(addr+immed_offset+1)));
-              p[0] = '#';
-              if (!addr_name(operand, rom, &p[1]))
-                sprintf(&p[1], "0x%04lx", operand);
+              con->dd_printf("#");
+              if (!addr_name(con, rom, operand))
+                con->dd_printf("0x%04lx", operand);
               ++immed_offset;
               ++immed_offset;
               break;
             case 'b': // b    byte immediate operand
-              p[0] = '#';
-              if (!addr_name(addr + immed_offset, rom, &p[1]))
-                sprintf(&p[1], "0x%02x", (uint)rom->get(addr+immed_offset));
+              con->dd_printf("#");
+              if (!addr_name(con, rom, addr + immed_offset))
+                con->dd_printf("0x%02x", (uint)rom->get(addr+immed_offset));
               ++immed_offset;
               break;
             case 'x': // x    extended addressing
               operand= ((rom->get(addr+immed_offset)<<8) |
                         (rom->get(addr+immed_offset+1)));
-              if (!addr_name(operand, rom, p))
-                sprintf(p, "0x%04lx", operand);
+              if (!addr_name(con, rom, operand))
+                con->dd_printf("0x%04lx", operand);
               ++immed_offset;
               ++immed_offset;
               break;
             case 'd': // d    direct addressing
-              sprintf(p, "0x%02x", (uint)rom->get(addr+immed_offset));
+              con->dd_printf("0x%02x", (uint)rom->get(addr+immed_offset));
               ++immed_offset;
               break;
             case '3': // 3    24bit index offset
               operand= ((rom->get(addr+immed_offset)<<16) |
                         (rom->get(addr+immed_offset+1)<<8) |
                         (rom->get(addr+immed_offset+2)));
-              if (!addr_name(operand, rom, p))
-                sprintf(p, "0x%06lx", operand);
+              if (!addr_name(con, rom, operand))
+                con->dd_printf("0x%06lx", operand);
               ++immed_offset;
               ++immed_offset;
               ++immed_offset;
@@ -905,15 +917,15 @@ cl_stm8::disass(t_addr addr, const char *sep)
             case '2': // 2    word index offset
               operand= ((rom->get(addr+immed_offset)<<8) |
                         (rom->get(addr+immed_offset+1)));
-              if (!addr_name(operand, rom, p))
-                sprintf(p, "0x%04lx", operand);
+              if (!addr_name(con, rom, operand))
+                con->dd_printf("0x%04lx", operand);
               ++immed_offset;
               ++immed_offset;
               break;
             case '1': // b    byte index offset
               operand= rom->get(addr+immed_offset);
-              if (!addr_name(operand, rom, p))
-                sprintf(p, "0x%02lx", operand);
+              if (!addr_name(con, rom, operand))
+                con->dd_printf("0x%02lx", operand);
               ++immed_offset;
               break;
             case 'p': // b    byte index offset
@@ -923,29 +935,19 @@ cl_stm8::disass(t_addr addr, const char *sep)
 		base= addr+immed_offset+1;
 		offs= rom->get(addr+immed_offset);
 		operand= base+offs;
-                if (!addr_name(operand, rom, p))
-		  sprintf(p, "0x%04lx", operand);
+                if (!addr_name(con, rom, operand))
+		  con->dd_printf("0x%04lx", operand);
 		++immed_offset;
 	      }
               break;
             default:
-              p[0] = '?';
-              p[1] = '\0';
+              con->dd_printf("?");
               break;
             }
-	  p += strlen(p);
-        }
-      else if (*b == ' ' && p - work < 16 + 6)
-        {
-	  b++;
-          while (p - work < 16 + 6) *(p++) = ' ';
         }
       else
-        *(p++)= *(b++);
+        con->dd_printf("%c", *b);
     }
-  *p= '\0';
-
-  return(strdup(work));
 }
 
 

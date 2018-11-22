@@ -1528,20 +1528,15 @@ cl_uc::dis_tbl(void)
   return(&empty);
 }
 
-char *
-cl_uc::disass(t_addr addr, const char *sep)
+void
+cl_uc::disass(class cl_console_base *con, t_addr addr, const char *sep)
 {
-  char *buf;
-
-  buf= (char*)malloc(100);
-  strcpy(buf, "uc::disass() unimplemented\n");
-  return(buf);
+  con->dd_printf("uc::disass() unimplemented\n");
 }
 
 void
 cl_uc::print_disass(t_addr addr, class cl_console_base *con)
 {
-  char *dis;
   class cl_brk *b;
   int i, l;
 
@@ -1550,7 +1545,6 @@ cl_uc::print_disass(t_addr addr, class cl_console_base *con)
 
   t_mem code= rom->get(addr);
   b= fbrk_at(addr);
-  dis= disass(addr, NULL);
   if (b)
     con->dd_printf("%c", (b->perm == brkFIX)?'F':'D');
   else
@@ -1573,8 +1567,9 @@ cl_uc::print_disass(t_addr addr, class cl_console_base *con)
 	con->dd_printf(" "), j--;
       i++;
     }
-  con->dd_printf(" %s\n", dis);
-  free((char *)dis);
+  con->dd_printf(" ");
+  disass(con, addr, NULL);
+  con->dd_printf("\n");
 }
 
 void
@@ -1647,40 +1642,31 @@ cl_uc::longest_inst(void)
 }
 
 bool
-cl_uc::addr_name(t_addr addr, class cl_address_space *as, int bitnr_high, int bitnr_low, char *buf)
+cl_uc::addr_name(class cl_console_base *con, class cl_address_space *as, t_addr addr, int bitnr_high, int bitnr_low)
 {
   t_index i;
-  
+
   if (vars->by_addr.search(as, addr, bitnr_high, bitnr_low, i))
     {
       class cl_var *v= (cl_var *)(vars->by_addr.at(i));
-      strcpy(buf, v->get_name());
+      con->dd_printf("%s", v->get_name());
       return true;
     }
 
-  //sprintf(buf, "%02lx[%d:%d]", (unsigned long)addr, bitnr_high, bitnr_low);
   return false;
 }
 
 bool
-cl_uc::addr_name(t_addr addr, class cl_address_space *as, int bitnr, char *buf)
+cl_uc::addr_name(class cl_console_base *con, class cl_address_space *as, t_addr addr, int bitnr)
 {
-  bool ret;
-
-  if (!(ret = addr_name(addr, as, bitnr, bitnr, buf)))
-    sprintf(buf, "%02lx.%d", (unsigned long)addr, bitnr);
-  return ret;
+  return addr_name(con, as, addr, bitnr, bitnr);
 }
 
 bool
-cl_uc::addr_name(t_addr addr, class cl_address_space *as, char *buf)
+cl_uc::addr_name(class cl_console_base *con, class cl_address_space *as, t_addr addr)
 {
-  bool ret;
-
-  if (!(ret = addr_name(addr, as, as->width - 1, 0, buf)) &&
-      !(ret = addr_name(addr, as, -1, -1, buf)))
-    sprintf(buf, "%02lx", (unsigned long)addr);
-  return ret;
+  return addr_name(con, as, addr, 7, 0) ||
+         addr_name(con, as, addr, -1, -1);
 }
 
 bool

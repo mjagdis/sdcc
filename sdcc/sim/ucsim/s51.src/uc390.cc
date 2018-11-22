@@ -1136,26 +1136,41 @@ cl_uc390::dis_tbl (void)
 
 }
 
-char *
-cl_uc390::disass (t_addr addr, const char *sep)
+void
+cl_uc390::disass(class cl_console_base *con, t_addr addr, const char *sep)
 {
-  char work[256], temp[200]/*, c[2]*/;
-  char *buf, *p, *b, *t, *org_b;
+  char *b;
   t_mem code;
+  int i;
   uchar dps;
 
   if (! (sfr->get (ACON) & 0x02)) /* AM1 set: 24-bit flat? */
-    return cl_51core::disass (addr, sep);
+    return cl_51core::disass(con, addr, sep);
   code = rom->get(addr);
 
-  p = work;
-  b = org_b = strdup(dis_tbl()[code].mnemonic);
-  while (*b)
+  b = strdup(dis_tbl()[code].mnemonic);
+
+  // Output everything up to the first space then pad.
+  for (i= 0; b[i]; i++)
     {
-      if (*b == '%')
+      if (b[i] == ' ')
+        {
+          con->dd_printf("%-*.*s", i, i, b);
+          if (sep)
+            con->dd_printf("%s", sep);
+          else
+            con->dd_printf("%*s", 6 - i, "");
+          b= &b[i + 1];
+          break;
+        }
+    }
+
+  for (; *b; b++)
+    {
+      if (b[0] == '%' && b[1])
         {
           b++;
-          switch (*(b++))
+          switch (*b)
             {
             case 'A': // absolute address
               // stock:
@@ -1164,24 +1179,24 @@ cl_uc390::disass (t_addr addr, const char *sep)
               //          (((code >> 5) & 0x07) * 256 +
               //          rom->get (addr + 1)));
 
-              sprintf (temp, /*"%06lx"*/rom->addr_format,
+              con->dd_printf (/*"%06lx"*/rom->addr_format,
                        (addr & 0xf80000L) |
                        (((code >> 5) & 0x07) * (256 * 256) +
                        (rom->get (addr + 1) * 256) +
                         rom->get (addr + 2)));
               break;
             case 'l': // long address
-              sprintf (temp, "%06lx",
+              con->dd_printf ("%06lx",
                        rom->get (addr + 1) * (256*256L) +
                        rom->get (addr + 2) * 256 +
                        rom->get (addr + 3));
                        // rom->get (addr + 1) * 256 + rom->get (addr + 2));
               break;
             case 'a': // addr8 (direct address) at 2nd byte
-	      daddr_name(rom->get(addr+1), temp);
+	      daddr_name(con, rom->get(addr+1));
               break;
             case '8': // addr8 (direct address) at 3rd byte
-	      daddr_name(rom->get(addr+2), temp);
+	      daddr_name(con, rom->get(addr+2));
               break;
             case 'b': // bitaddr at 2nd byte
 	      {
@@ -1189,69 +1204,42 @@ cl_uc390::disass (t_addr addr, const char *sep)
 		/*if (get_name (ba, bit_tbl(), temp))
 		  break;
 		if (ba<128)
-		  addr_name((ba/8)+32,iram,temp);
+		  addr_name(con, iram, (ba/8)+32);
 		else
-		  addr_name(ba&0xf8,sfr,temp);
+		  addr_name(con, sfr, ba&0xf8);
 		strcat (temp, ".");
 		sprintf (c, "%1d", (int)(ba & 0x07));
 		strcat (temp, c);
 		break;*/
-		baddr_name(ba, temp);
+		baddr_name(con, ba);
 		break;
 	      }
             case 'r': // rel8 address at 2nd byte
-              sprintf (temp, "%04x",
+              con->dd_printf ("%04x",
                        /*t_addr*/int (addr + 2 + (signed char) (rom->get (addr + 1))));
               break;
             case 'R': // rel8 address at 3rd byte
-              sprintf (temp, "%04x",
+              con->dd_printf ("%04x",
                        /*t_addr*/int (addr + 3 + (signed char) (rom->get (addr + 2))));
               break;
             case 'd': // data8 at 2nd byte
-              sprintf (temp, "%02x", (int)rom->get (addr + 1));
+              con->dd_printf ("%02x", (int)rom->get (addr + 1));
               break;
             case 'D': // data8 at 3rd byte
-              sprintf (temp, "%02x", (int)rom->get (addr + 2));
+              con->dd_printf ("%02x", (int)rom->get (addr + 2));
               break;
             case 'i': // inc/dec dptr
               dps = sfr->get(DPS);
-              sprintf (temp, ((dps & 0x01) ? (dps & 0x80) : (dps & 0x40)) ? "DEC" : "INC");
+              con->dd_printf (((dps & 0x01) ? (dps & 0x80) : (dps & 0x40)) ? "DEC" : "INC");
               break;
             default:
-              strcpy (temp, "?");
+              con->dd_printf ("?");
               break;
             }
-          t = temp;
-          while (*t)
-            *p++ = *t++;
         }
       else
-        *p++ = *b++;
+        con->dd_printf("%c", *b);
     }
-  *p = '\0';
-
-  p = strchr (work, ' ');
-  if (!p)
-    {
-      buf = strdup (work);
-      return buf;
-    }
-  if (sep == NULL)
-    buf = (char *) malloc (6 + strlen (p) + 1);
-  else
-    buf = (char *) malloc ((p - work) + strlen (sep) + strlen (p) + 1);
-  for (p = work, b = buf; *p != ' '; p++, b++)
-    *b = *p;
-  p++;
-  *b = '\0';
-  if (sep == NULL)
-    while (strlen (buf) < 6)
-      strcat (buf, " ");
-  else
-    strcat (buf, sep);
-  strcat (buf, p);
-  free(org_b);
-  return buf;
 }
 
 void

@@ -362,15 +362,14 @@ cl_tlcs::condname_C(u8_t cc)
   return "?";
 }
 
-char *
-cl_tlcs::disass(t_addr addr, const char *sep)
+void
+cl_tlcs::disass(class cl_console_base *con, t_addr addr, const char *sep)
 {
   struct dis_entry *de;
+  const char *b;
   u64_t c;
   int i;
-  chars s("");
-  char *buf, *t, l[20];
-  
+
   c= 0;
   for (i= 7; i>=0; i--)
     {
@@ -387,57 +386,74 @@ cl_tlcs::disass(t_addr addr, const char *sep)
       de++;
     }
   if (de->mnemonic == NULL)
-    return strdup("?");
-
-  for (t= (char*)de->mnemonic; *t; t++)
     {
-      if (*t == '%')
+      con->dd_printf("?");
+      return;
+    }
+
+  b= (char *)de->mnemonic;
+
+  // Output everything up to the first space then pad.
+  for (i= 0; b[i]; i++)
+    {
+      if (b[i] == ' ')
+        {
+          con->dd_printf("%-*.*s", i, i, b);
+          if (sep)
+            con->dd_printf("%s", sep);
+          else
+            con->dd_printf("%*s", 6 - i, "");
+          b= &b[i + 1];
+          break;
+        }
+    }
+
+  for (; *b; b++)
+    {
+      if (b[0] == '%' && b[1])
 	{
-	  t++;
-	  switch (*t)
+	  b++;
+	  switch (*b)
 	    {
-	    case 'r': /*  r in 1st byte */ s+= regname_r(c); break;
-	    case 'p': /*  r in 2nd byte */ s+= regname_r(c>>8); break;
-	    case 't': /*  r in 3rd byte */ s+= regname_r(c>>16); break;
-	    case 'T': /*  r in 4th byte */ s+= regname_r(c>>24); break;
-	    case 'R': /* rr in 1st byte */ s+= regname_R(c); break;
-	    case 's': /* rr in 2nd byte */ s+= regname_R(c>>8); break;
-	    case 'u': /* rr in 3rd byte */ s+= regname_R(c>>16); break;
-	    case 'U': /* rr in 4th byte */ s+= regname_R(c>>24); break;
-	    case 'Q': /* qq in 1st byte */ s+= regname_Q(c); break;
-	    case 'I': /* ix in 1st byte */ s+= regname_i(c); break;
-	    case 'i': /* ix in 2nd byte */ s+= regname_i(c>>8); break;
-	    case 'j': /* ix in 3rd byte */ s+= regname_i(c>>16); break;
-	    case 'J': /* ix in 4th byte */ s+= regname_i(c>>24); break;
-	    case 'a': /*  b in 1st byte */ s+= bitname(c); break;
-	    case 'b': /*  b in 2nd byte */ s+= bitname(c>>8); break;
-	    case 'B': /*  b in 3rd byte */ s+= bitname(c>>16); break;
-	    case 'e': /*  b in 4th byte */ s+= bitname(c>>24); break;
-	    case 'y': /* cc in 1st byte */ s+= condname_cc(c); break; // with ,
-	    case 'c': /* cc in 2nd byte */ s+= condname_cc(c>>8); break; // with ,
-	    case 'C': /* cc in 2nd byte */ s+= condname_C(c>>8); break; // without ,
-	    case 'f': /* cc in 4th byte */ s+= condname_cc(c>>24); break; // with ,
-	    case 'F': /* cc in 3rd byte */ s+= condname_cc(c>>16); break; // with ,
-	    case 'n': /*  n in 2nd byte */ snprintf(l,19,"%02x",(int)((c>>8)&0xff));s+= l; break;
-	    case 'N': /*  n in 3rd byte */ snprintf(l,19,"%02x",(int)((c>>16)&0xff));s+= l; break;
-	    case 'o': /*  n in 4th byte */ snprintf(l,19,"%02x",(int)((c>>24)&0xff));s+= l; break;
-	    case 'O': /*  n in 5th byte */ snprintf(l,19,"%02x",(int)((c>>32)&0xff));s+= l; break;
-	    case '1': /*  PC+2+d in 2nd byte */ snprintf(l,19,"0x%04x",(int)(addr+2+i8_t((c>>8)&0xff))); s+= l; break;
-	    case 'd': /*  d in 2nd byte */ snprintf(l,19,"%+d",(int)(i8_t((c>>8)&0xff))); s+= l; break;
-	    case 'D': /* cd in 2,3 byte */ snprintf(l,19,"0x%04x",(int)(addr+3+i16_t((c>>8)&0xffff))); s+= l; break;	      
-	    case 'M': /* mn in 2,3 byte */ snprintf(l,19,"0x%04x",(int)((c>>8)&0xffff)); s+= l; break;
-	    case 'm': /* mn in 3,4 byte */ snprintf(l,19,"0x%04x",(int)((c>>16)&0xffff)); s+= l; break;
-	    case 'X': /* mn in 4,5 byte */ snprintf(l,19,"0x%04x",(int)((c>>24)&0xffff)); s+= l; break;
-	    case 'x': /* mn in 5,6 byte */ snprintf(l,19,"0x%04x",(int)((c>>32)&0xffff)); s+= l; break;
-	    default: s+= '?'; break;
+	    case 'r': /*  r in 1st byte */ con->dd_printf("%s", regname_r(c)); break;
+	    case 'p': /*  r in 2nd byte */ con->dd_printf("%s", regname_r(c>>8)); break;
+	    case 't': /*  r in 3rd byte */ con->dd_printf("%s", regname_r(c>>16)); break;
+	    case 'T': /*  r in 4th byte */ con->dd_printf("%s", regname_r(c>>24)); break;
+	    case 'R': /* rr in 1st byte */ con->dd_printf("%s", regname_R(c)); break;
+	    case 's': /* rr in 2nd byte */ con->dd_printf("%s", regname_R(c>>8)); break;
+	    case 'u': /* rr in 3rd byte */ con->dd_printf("%s", regname_R(c>>16)); break;
+	    case 'U': /* rr in 4th byte */ con->dd_printf("%s", regname_R(c>>24)); break;
+	    case 'Q': /* qq in 1st byte */ con->dd_printf("%s", regname_Q(c)); break;
+	    case 'I': /* ix in 1st byte */ con->dd_printf("%s", regname_i(c)); break;
+	    case 'i': /* ix in 2nd byte */ con->dd_printf("%s", regname_i(c>>8)); break;
+	    case 'j': /* ix in 3rd byte */ con->dd_printf("%s", regname_i(c>>16)); break;
+	    case 'J': /* ix in 4th byte */ con->dd_printf("%s", regname_i(c>>24)); break;
+	    case 'a': /*  b in 1st byte */ con->dd_printf("%s", bitname(c)); break;
+	    case 'b': /*  b in 2nd byte */ con->dd_printf("%s", bitname(c>>8)); break;
+	    case 'B': /*  b in 3rd byte */ con->dd_printf("%s", bitname(c>>16)); break;
+	    case 'e': /*  b in 4th byte */ con->dd_printf("%s", bitname(c>>24)); break;
+	    case 'y': /* cc in 1st byte */ con->dd_printf("%s", condname_cc(c)); break; // with ,
+	    case 'c': /* cc in 2nd byte */ con->dd_printf("%s", condname_cc(c>>8)); break; // with ,
+	    case 'C': /* cc in 2nd byte */ con->dd_printf("%s", condname_C(c>>8)); break; // without ,
+	    case 'f': /* cc in 4th byte */ con->dd_printf("%s", condname_cc(c>>24)); break; // with ,
+	    case 'F': /* cc in 3rd byte */ con->dd_printf("%s", condname_cc(c>>16)); break; // with ,
+	    case 'n': /*  n in 2nd byte */ con->dd_printf("%02x",(int)((c>>8)&0xff)); break;
+	    case 'N': /*  n in 3rd byte */ con->dd_printf("%02x",(int)((c>>16)&0xff)); break;
+	    case 'o': /*  n in 4th byte */ con->dd_printf("%02x",(int)((c>>24)&0xff)); break;
+	    case 'O': /*  n in 5th byte */ con->dd_printf("%02x",(int)((c>>32)&0xff)); break;
+	    case '1': /*  PC+2+d in 2nd byte */ con->dd_printf("0x%04x",(int)(addr+2+i8_t((c>>8)&0xff))); break;
+	    case 'd': /*  d in 2nd byte */ con->dd_printf("%+d",(int)(i8_t((c>>8)&0xff))); break;
+	    case 'D': /* cd in 2,3 byte */ con->dd_printf("0x%04x",(int)(addr+3+i16_t((c>>8)&0xffff))); break;
+	    case 'M': /* mn in 2,3 byte */ con->dd_printf("0x%04x",(int)((c>>8)&0xffff)); break;
+	    case 'm': /* mn in 3,4 byte */ con->dd_printf("0x%04x",(int)((c>>16)&0xffff)); break;
+	    case 'X': /* mn in 4,5 byte */ con->dd_printf("0x%04x",(int)((c>>24)&0xffff)); break;
+	    case 'x': /* mn in 5,6 byte */ con->dd_printf("0x%04x",(int)((c>>32)&0xffff)); break;
+	    default: con->dd_printf("?"); break;
 	    }
 	}
       else
-	s+= *t;
+        con->dd_printf("%c", *b);
     }
-  
-  buf= strdup(s);
-  return buf;
 }
 
 int

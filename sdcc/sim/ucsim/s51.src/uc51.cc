@@ -1158,39 +1158,53 @@ cl_51core::bit_tbl(void)
   return(bit_tab51);
 }
 
-char *
-cl_51core::disass(t_addr addr, const char *sep)
+void
+cl_51core::disass(class cl_console_base *con, t_addr addr, const char *sep)
 {
-  char work[256], temp[200]/*, c[2]*/;
-  char *buf, *p, *t, *s;
   const char *b;
   t_mem code= rom->get(addr);
+  int i;
 
-  p= work;
   b= dis_tbl()[code].mnemonic;
-  while (*b)
+
+  // Output everything up to the first space then pad.
+  for (i= 0; b[i]; i++)
     {
-      if (*b == '%')
+      if (b[i] == ' ')
+        {
+          con->dd_printf("%-*.*s", i, i, b);
+          if (sep)
+            con->dd_printf("%s", sep);
+          else
+            con->dd_printf("%*s", 6 - i, "");
+          b= &b[i + 1];
+          break;
+        }
+    }
+
+  for (; *b; b++)
+    {
+      if (b[0] == '%' && b[1])
 	{
 	  b++;
-	  switch (*(b++))
+	  switch (*b)
 	    {
 	    case 'A': // absolute address
-	      sprintf(temp, "%04x",
+	      con->dd_printf("%04x",
 		      /*t_addr*/int((addr&0xf800)|
 				    (((code>>5)&0x07)*256 +
 				     rom->get(addr+1))));
 	      break;
 	    case 'l': // long address
-	      sprintf(temp, "%04x",
+	      con->dd_printf("%04x",
 		      /*t_addr*/int(rom->get(addr+1)*256 +
 				    rom->get(addr+2)));
 	      break;
 	    case 'a': // addr8 (direct address) at 2nd byte
-	      daddr_name(rom->get(addr+1), temp);
+	      daddr_name(con, rom->get(addr+1));
 	      break;
 	    case '8': // addr8 (direct address) at 3rd byte
-	      daddr_name(rom->get(addr+2), temp);
+	      daddr_name(con, rom->get(addr+2));
 	      break;
 	    case 'b': // bitaddr at 2nd byte
 	      {
@@ -1204,64 +1218,36 @@ cl_51core::disass(t_addr addr, const char *sep)
 		strcat(temp, ".");
 		sprintf(c, "%1d", (int)(ba & 0x07));
 		strcat(temp, c);*/
-		baddr_name(ba, temp);
+		baddr_name(con, ba);
 		break;
 	      }
 	    case 'r': // rel8 address at 2nd byte
-	      sprintf(temp, "%04x",
+	      con->dd_printf("%04x",
 		      /*t_addr*/int(addr+2+(signed char)(rom->get(addr+1))));
 	      break;
 	    case 'R': // rel8 address at 3rd byte
-	      sprintf(temp, "%04x",
+	      con->dd_printf("%04x",
 		      /*t_addr*/int(addr+3+(signed char)(rom->get(addr+2))));
 	      break;
 	    case 'd': // data8 at 2nd byte
-	      sprintf(temp, "%02x", (int)rom->get(addr+1));
+	      con->dd_printf("%02x", (int)rom->get(addr+1));
 	      break;
 	    case 'D': // data8 at 3rd byte
-	      sprintf(temp, "%02x", (int)rom->get(addr+2));
+	      con->dd_printf("%02x", (int)rom->get(addr+2));
 	      break;
 	    case '6': // data16 at 2nd(H)-3rd(L) byte
-	      sprintf(temp, "%04x",
+	      con->dd_printf("%04x",
 		      /*t_addr*/int(rom->get(addr+1)*256 +
 				    rom->get(addr+2)));
 	      break;
 	    default:
-	      strcpy(temp, "?");
+	      con->dd_printf("?");
 	      break;
 	    }
-	  t= temp;
-	  while (*t)
-	    *(p++)= *(t++);
 	}
       else
-	*(p++)= *(b++);
+        con->dd_printf("%c", *b);
     }
-  *p= '\0';
-
-  p= strchr(work, ' ');
-  if (!p)
-    {
-      buf= strdup(work);
-      return(buf);
-    }
-  if (sep == NULL)
-    buf= (char *)malloc(6+strlen(p)+1);
-  else
-    buf= (char *)malloc((p-work)+strlen(sep)+strlen(p)+1);
-  for (p= work, s= buf; *p != ' '; p++, s++)
-    *s= *p;
-  p++;
-  *s= '\0';
-  if (sep == NULL)
-    {
-      while (strlen(buf) < 6)
-	strcat(buf, " ");
-    }
-  else
-    strcat(buf, sep);
-  strcat(buf, p);
-  return(buf);
 }
 
 
@@ -1460,50 +1446,44 @@ cl_51core::bit_address(class cl_memory *mem,
 /* Get name of directly addressed iram/sfr cell */
 
 void
-cl_51core::daddr_name(t_addr addr, char *buf)
+cl_51core::daddr_name(class cl_console_base *con, t_addr addr)
 {
-  if (!buf)
-    return;
   if (addr < 128)
     {
       // register?
-      if (addr_name(addr, regs, buf))
+      if (addr_name(con, regs, addr))
 	return;
       // variale?
-      if (addr_name(addr, iram, buf))
+      if (addr_name(con, iram, addr))
 	return;
     }
   else
     {
       // dptr?
-      if (addr_name(addr-0x82, dptr, buf))
+      if (addr_name(con, dptr, addr-0x82))
 	return;
       // sfr?
-      if (addr_name(addr, sfr, buf))
+      if (addr_name(con, sfr, addr))
 	return;
     }
-  unsigned int a= addr;
-  sprintf(buf, "%02x", a);
+  con->dd_printf("%02x", (unsigned int)addr);
 }
 
 /* Get name of a bit cell */
 
 void
-cl_51core::baddr_name(t_addr addr, char *buf)
+cl_51core::baddr_name(class cl_console_base *con, t_addr addr)
 {
   t_addr ma;
   
-  if (!buf)
-    return;
-  if (addr_name(addr, bits, buf))
+  if (addr_name(con, bits, addr))
     return;
   if (addr < 128)
     ma= 32+(addr/8);
   else
     ma= addr&0xf8;
-  daddr_name(ma, buf);
-  chars c= chars("", "%s.%d", buf, (int)(addr & 7));
-  strcpy(buf, (char*)c);
+  daddr_name(con, ma);
+  con->dd_printf(".%d", (int)(addr & 7));
 }
 
 
