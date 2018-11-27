@@ -1543,31 +1543,58 @@ cl_uc::print_disass(t_addr addr, class cl_console_base *con)
   if (!rom)
     return;
 
-  t_mem code= rom->get(addr);
+  int li= longest_inst();
+  class cl_var *var = NULL;
+  t_index var_i;
+
+  long label_width = -1;
+  cl_option *o = application->options->get_option("label_width");
+  if (o)
+    o->get_value(&label_width);
+  if (label_width < 0)
+    label_width = vars->get_max_name_len();
+
+  if (vars->by_addr.search(rom, addr, -1, -1, var_i))
+    {
+      var = vars->by_addr.at(var_i);
+
+      class cl_var *var_next;
+      while (++var_i < vars->by_addr.count &&
+             (var_next = (cl_var *)(vars->by_addr.at(var_i))) &&
+             var_next->mem == rom && var_next->addr == addr && var_next->bitnr_high < 0)
+        {
+          con->dd_printf("   ");
+          con->dd_printf(rom->addr_format, addr);
+          con->dd_printf("%*s %s:%*s\n",
+                         li * (1 + rom->data_format_width), "",
+                         var->get_name(), label_width - strlen(var->get_name()), "");
+          var = var_next;
+        }
+    }
+
   b= fbrk_at(addr);
   if (b)
     con->dd_printf("%c", (b->perm == brkFIX)?'F':'D');
   else
     con->dd_printf(" ");
+
   con->dd_printf("%c ", inst_at(addr)?' ':'?');
-  con->dd_printf(rom->addr_format, addr); con->dd_printf(" ");
-  con->dd_printf(rom->data_format, code);
+  con->dd_printf(rom->addr_format, addr);
+
   l= inst_length(addr);
-  for (i= 1; i < l; i++)
+  for (i= 0; i < l; i++)
     {
       con->dd_printf(" ");
       con->dd_printf(rom->data_format, rom->get(addr+i));
     }
-  int li= longest_inst();
-  while (i < li)
-    {
-      int j;
-      j= rom->width/4 + ((rom->width%4)?1:0) + 1;
-      while (j)
-	con->dd_printf(" "), j--;
-      i++;
-    }
-  con->dd_printf(" ");
+  for (; i < li; i++)
+    con->dd_printf(" %*s", rom->data_format_width, "");
+
+  if (var)
+    con->dd_printf(" %s:%*s ", var->get_name(), label_width - strlen(var->get_name()), "");
+  else
+    con->dd_printf(" %*s  ", label_width, "");
+
   disass(con, addr, NULL);
   con->dd_printf("\n");
 }

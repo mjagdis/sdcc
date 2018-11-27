@@ -821,16 +821,6 @@ cl_stm8::disass(class cl_console_base *con, t_addr addr, const char *sep)
   int len = 0;
   int immed_offset = 0;
 
-  t_index i;
-
-  if (vars->by_addr.search(rom, addr, -1, -1, i))
-    {
-      class cl_var *v= (cl_var *)(vars->by_addr.at(i));
-      con->dd_printf("%s:%*s", v->get_name(), 15 - strlen(v->get_name()), "");
-    }
-  else
-    con->dd_printf("%16s", "");
-
   b = get_disasm_info(addr, &len, NULL, &immed_offset, NULL);
 
   if (b == NULL) {
@@ -839,6 +829,7 @@ cl_stm8::disass(class cl_console_base *con, t_addr addr, const char *sep)
   }
 
   // Output everything up to the first space then pad.
+  int i;
   for (i= 0; b[i]; i++)
     {
       if (b[i] == ' ')
