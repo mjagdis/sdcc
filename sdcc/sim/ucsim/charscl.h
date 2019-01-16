@@ -55,6 +55,7 @@ public:
   virtual bool empty();
   virtual bool nempty() { return !empty(); }
   virtual bool is_null();
+  virtual chars &uppercase(void);
   virtual int len() { return chars_length; }
   virtual void start_parse(void) { start_parse(0); }
   virtual void start_parse(int at) { pars_pos= at; }

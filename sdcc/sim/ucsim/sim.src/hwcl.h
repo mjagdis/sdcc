@@ -77,6 +77,8 @@ class cl_hw: public cl_guiobj
   class cl_hw_io *io;
   int cache_run;
   unsigned int cache_time;
+ private:
+  virtual void hwreg_internal(class cl_memory *mem, t_addr addr, chars prefix, va_list ap);
  public:
   cl_hw(class cl_uc *auc, enum hw_cath cath, int aid, const char *aid_string);
   virtual ~cl_hw(void);
@@ -100,8 +102,13 @@ class cl_hw: public cl_guiobj
   virtual char *cfg_help(t_addr addr);
   
   virtual void set_cmd(class cl_cmdline *cmdline, class cl_console_base *con);
-  virtual class cl_memory_cell *register_cell(class cl_address_space *mem,
-					      t_addr addr);
+
+  virtual void hwreg(class cl_address_space *mem, t_addr addr, const char *name, const char *desc,
+                     /* const char *name, int bitnr_high, int bitnr_low, const char *desc, */ ...);
+  virtual void hwreg(const char *regname,
+                     /* const char *name, int bitnr_high, int bitnr_low, char *desc, */ ...);
+
+  virtual class cl_memory_cell *register_cell(class cl_address_space *mem, t_addr addr);
   virtual class cl_memory_cell *register_cell(class cl_memory_cell *cell);
   virtual void unregister_cell(class cl_memory_cell *cell);
 

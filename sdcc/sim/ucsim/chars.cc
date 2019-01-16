@@ -25,6 +25,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 02111-1307, USA. */
 /*@1@*/
 
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -303,6 +304,18 @@ bool
 chars::is_null()
 {
   return chars_string == NULL;
+}
+
+chars &
+chars::uppercase(void)
+{
+  if (!dynamic)
+    allocate_string(chars_string);
+
+  for (int i= 0; i < chars_length; i++)
+    chars_string[i]= toupper(chars_string[i]);
+
+  return *this;
 }
 
 // Assignment operators

@@ -196,6 +196,54 @@ cl_hw::set_cmd(class cl_cmdline *cmdline, class cl_console_base *con)
   con->dd_printf("Nothing to do\n");
 }
 
+void
+cl_hw::hwreg_internal(class cl_memory *mem, t_addr addr, chars prefix, va_list ap)
+{
+  const char *name;
+  while ((name = va_arg(ap, typeof(name)))) {
+    int bitnr_high = va_arg(ap, int);
+    int bitnr_low = va_arg(ap, int);
+    const char *desc = va_arg(ap, typeof(desc));
+    cl_var *v;
+
+    uc->vars->add(v= new cl_var(prefix + chars(name), mem, addr, desc, bitnr_high, bitnr_low));
+    v->init();
+  }
+}
+
+void
+cl_hw::hwreg(class cl_address_space *mem, t_addr addr, const char *regname, const char *desc, ...)
+{
+  va_list ap;
+  chars prefix = cchars(get_name()).uppercase() + chars("_") + chars(regname);
+  cl_var *v;
+
+  uc->vars->add(v= new cl_var(prefix, mem, addr, desc, mem->width - 1, 0));
+  v->init();
+
+  prefix += chars("_");
+  va_start(ap, desc);
+  hwreg_internal(mem, addr, prefix, ap);
+  va_end(ap);
+}
+
+void
+cl_hw::hwreg(const char *regname, ...)
+{
+  chars prefix = cchars(get_name()).uppercase() + chars("_") + chars(regname);
+  int i;
+
+  if (uc->vars->by_name.search(prefix, i)) {
+    cl_var *reg= uc->vars->by_name.at(i);
+    prefix += chars("_");
+
+    va_list ap;
+    va_start(ap, regname);
+    hwreg_internal(reg->mem, reg->addr, prefix, ap);
+    va_end(ap);
+  }
+}
+
 class cl_memory_cell *
 cl_hw::register_cell(class cl_address_space *mem, t_addr addr)
 {
