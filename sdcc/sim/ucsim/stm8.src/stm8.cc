@@ -820,6 +820,7 @@ cl_stm8::disass(class cl_console_base *con, t_addr addr, const char *sep)
   const char *b;
   int len = 0;
   int immed_offset = 0;
+  t_addr operand = 0;
 
   b = get_disasm_info(addr, &len, NULL, &immed_offset, NULL);
 
@@ -848,8 +849,6 @@ cl_stm8::disass(class cl_console_base *con, t_addr addr, const char *sep)
     {
       if (b[0] == '%' && b[1])
         {
-          t_addr operand;
-
           b++;
           switch (*b)
             {
@@ -930,6 +929,16 @@ cl_stm8::disass(class cl_console_base *con, t_addr addr, const char *sep)
 		  con->dd_printf("0x%04lx", operand);
 		++immed_offset;
 	      }
+              break;
+            case 'B': // B    bit number
+              {
+                uint bit = (rom->get(addr+1) & 0xf) >> 1;
+                t_index var_i;
+                if (vars->by_addr.search(rom, operand, bit, bit, var_i))
+                  con->dd_printf("%s", vars->by_addr.at(var_i)->get_name());
+                else
+                  con->dd_printf("%u", bit);
+              }
               break;
             default:
               con->dd_printf("?");
