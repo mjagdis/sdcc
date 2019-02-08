@@ -206,8 +206,6 @@ cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_
 
   if (start < 0)
     start= dump_finished;
-  if (stop < 0)
-    stop= start + 10*bpl - 1;
 
   t_addr lva= lowest_valid_address();
   t_addr hva= highest_valid_address();
@@ -216,6 +214,13 @@ cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_
     start= lva;
   if (start > hva)
     return dump_finished;
+
+  int lines= -1;
+  if (stop < 0)
+    {
+      stop= hva;
+      lines= 10;
+    }
   if (stop > hva)
     stop= hva;
   if (stop < lva)
@@ -295,6 +300,8 @@ cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_
                        (bitnr_high < 0 && var_next->bitnr_high == width - 1 && var_next->bitnr_low == 0)))
                     {
                       f->write_str("\n");
+                      if (lines > 0)
+                        lines--;
                       var = var_next;
                       var_next = NULL;
                       continue;
@@ -348,6 +355,8 @@ cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_
                 f->prntf(" (%*d)", (nbits > 16 ? 10 : (nbits > 8 ? 5 : 3)), 0 - ((1U << nbits) - m));
 
               f->write_str("\n");
+              if (lines > 0)
+                lines--;
 
               // Only advance if there is no more to say about this location.
               var = NULL;
@@ -368,6 +377,8 @@ cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_
                 {
                   start += step;
                   dump_finished= start;
+                  if (lines == 0)
+                    break;
                   var = var_for(start, bitnr_high, bitnr_low, var_i);
                 }
               continue;
@@ -419,6 +430,8 @@ cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_
 
       start+= n*step;
       dump_finished= start;
+      if (lines > 0 && --lines == 0)
+        break;
     }
 
   return(dump_finished);
@@ -429,6 +442,9 @@ cl_memory::dump_s(t_addr start, t_addr stop, int bpl, class cl_f *f)
 {
   t_addr lva= lowest_valid_address();
   t_addr hva= highest_valid_address();
+
+  if (stop < 0)
+    stop= start + 10 * bpl - 1;
 
   t_addr a= start;
   t_mem d= read(a);
@@ -456,6 +472,9 @@ cl_memory::dump_b(t_addr start, t_addr stop, int bpl, class cl_f *f)
   t_addr lva= lowest_valid_address();
   t_addr hva= highest_valid_address();
 
+  if (stop < 0)
+    stop= start + 10 * bpl - 1;
+
   t_addr a= start;
   t_mem d= read(a);
   while ((a <= stop) &&
@@ -479,6 +498,9 @@ cl_memory::dump_i(t_addr start, t_addr stop, int bpl, class cl_f *f)
   unsigned int sum;
   t_addr start_line;
   
+  if (stop < 0)
+    stop= start + 10 * bpl - 1;
+
   if (start < lva)
     start= lva;
   if (stop > hva)

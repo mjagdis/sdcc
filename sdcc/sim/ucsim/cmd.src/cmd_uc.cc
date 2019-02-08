@@ -307,9 +307,8 @@ COMMAND_DO_WORK_UC(cl_dump_cmd)
       mem= params[0]->value.memory.memory;
   }
   else if (cmdline->syntax_match(uc, MEMORY ADDRESS)) {
-    mem  = cmdline->param(0)->value.memory.memory;
-    start= cmdline->param(1)->value.address;
-    end  = start+10*8-1;
+    mem  = params[0]->value.memory.memory;
+    start= params[1]->value.address;
   }
   else if (cmdline->syntax_match(uc, MEMORY ADDRESS ADDRESS)) {
     mem  = params[0]->value.memory.memory;

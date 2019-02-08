@@ -126,7 +126,7 @@ COMMAND_DO_WORK_UC(cl_set_mem_cmd)
     }
   else
     syntax_error(con);
-  
+
   return(false);
 }
 
