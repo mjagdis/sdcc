@@ -941,6 +941,111 @@ cl_stm8::get_disasm_info(t_addr addr,
 }
 
 void
+cl_stm8::analyze(t_addr addr)
+{
+
+  const char *mnemonic;
+  int length = 0, branch = 0, immed_offset = 0;
+  t_addr operand = 0;
+
+  // cl_uc::load_hex_file always fires off an analyze(0)
+  if (!addr)
+    {
+      // Forget everything we knew previously.
+      for (addr = rom->get_start_address(); addr < rom->highest_valid_address(); addr++)
+        del_inst_at(addr);
+
+      // We could also just iterate through the interrupt table and
+      // call analyze on each target address. But there's nothing
+      // to stop you using unused vector space for code. Of course,
+      // the unused vectors could also be totally unset in which
+      // case processing the vector table like this could stop
+      // prematurely. So we have to be fairly pedantic here.
+      for (addr = 0x8000; addr <= 0x807c; addr += 4)
+        if (rom->get(addr) == 0x82) // int
+          {
+            set_inst_at(addr);
+            analyze((rom->get(addr+immed_offset+1)<<16) |
+                      (rom->get(addr+immed_offset+2)<<8) |
+                      (rom->get(addr+immed_offset+3)));
+          }
+      // P.S. we can't do anything about left over ints in the
+      // interrupt table that haven't been cleared out.
+      return;
+    }
+
+  while (!inst_at(addr) && (mnemonic = get_disasm_info(addr, &length, &branch, &immed_offset, NULL)))
+    {
+      set_inst_at(addr);
+
+      if (branch == 'r' || branch == '!')
+        return;
+
+      for (const char *b = mnemonic; *b; b++)
+        {
+          if (b[0] == '%' && b[1])
+            {
+              b++;
+              switch (*b)
+                {
+                  case '3': // 3    24bit index offset
+                    ++immed_offset;
+                   // Fall through
+                  case '2': // 2    word index offset
+                  case 'w': // w    word immediate operand
+                    ++immed_offset;
+                    // Fall through
+                  case '1': // b    byte index offset
+                  case 'b': // b    byte immediate operand
+                  case 'd': // d    direct addressing
+                  case 's': // s    signed byte immediate
+                    ++immed_offset;
+                    break;
+
+                  case 'e': // e    extended 24bit immediate operand
+                    operand= ((rom->get(addr+immed_offset)<<16) |
+                              (rom->get(addr+immed_offset+1)<<8) |
+                              (rom->get(addr+immed_offset+2)));
+                    ++immed_offset;
+                    ++immed_offset;
+                    ++immed_offset;
+                    break;
+                  case 'x': // x    extended addressing
+                    operand= ((rom->get(addr+immed_offset)<<8) |
+                              (rom->get(addr+immed_offset+1)));
+                    ++immed_offset;
+                    ++immed_offset;
+                    break;
+                  case 'p': // b    byte index offset
+                    {
+                      long int base;
+                      i8_t offs;
+                      base= addr+immed_offset+1;
+                      offs= rom->get(addr+immed_offset);
+                      operand= base+offs;
+                      ++immed_offset;
+                    }
+                    break;
+                  default:
+                    break;
+                }
+            }
+        }
+
+      if (branch != ' ')
+        {
+          // N.B. With jumps, branches and calls the target address is always
+          // given by the last operand.
+          analyze(operand);
+          if (branch == 'j')
+            return;
+        }
+
+      addr= rom->validate_address(addr + length);
+    }
+}
+
+void
 cl_stm8::disass(class cl_console_base *con, t_addr addr, const char *sep)
 {
   const char *b;
