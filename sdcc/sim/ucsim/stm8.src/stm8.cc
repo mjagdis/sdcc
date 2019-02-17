@@ -943,8 +943,10 @@ cl_stm8::get_disasm_info(t_addr addr,
 void
 cl_stm8::analyze(t_addr addr)
 {
-
+  char label[80];
+  class cl_var *v;
   const char *mnemonic;
+  t_index i;
   int length = 0, branch = 0, immed_offset = 0;
   t_addr operand = 0;
 
@@ -954,6 +956,19 @@ cl_stm8::analyze(t_addr addr)
       // Forget everything we knew previously.
       for (addr = rom->get_start_address(); addr < rom->highest_valid_address(); addr++)
         del_inst_at(addr);
+
+      i = 0;
+      while (i < vars->by_name.count)
+        {
+          v = vars->by_name.at(i);
+          if (!strcmp(v->desc, "[analyze]"))
+            vars->del(v->get_name());
+          else
+            i++;
+        }
+      func_index = 1;
+      label_index = 1;
+      loop_index = 1;
 
       // We could also just iterate through the interrupt table and
       // call analyze on each target address. But there's nothing
@@ -965,9 +980,28 @@ cl_stm8::analyze(t_addr addr)
         if (rom->get(addr) == 0x82) // int
           {
             set_inst_at(addr);
-            analyze((rom->get(addr+immed_offset+1)<<16) |
+
+            operand = (rom->get(addr+immed_offset+1)<<16) |
                       (rom->get(addr+immed_offset+2)<<8) |
-                      (rom->get(addr+immed_offset+3)));
+                      (rom->get(addr+immed_offset+3));
+
+            if (!vars->by_addr.search(rom, operand, -1, -1, i))
+              {
+                if (addr == 0x8000)
+                  snprintf(label, sizeof(label)-1, "%s", ".reset");
+                else if (rom->get(operand) == 0x80) // jumps straight to iret
+                  snprintf(label, sizeof(label)-1, "%s", ".isr_unused");
+                else if (addr == 0x8004)
+                  snprintf(label, sizeof(label)-1, "%s", ".trap");
+                else
+                  snprintf(label, sizeof(label)-1, "%s%lu", ".interrupt", ((unsigned long)addr - 0x8008) / 4);
+
+                v = new cl_var(label, rom, operand, chars("[analyze]"), -1, -1);
+                v->init();
+                vars->add(v);
+              }
+
+            analyze(operand);
           }
       // P.S. we can't do anything about left over ints in the
       // interrupt table that haven't been cleared out.
@@ -1034,9 +1068,25 @@ cl_stm8::analyze(t_addr addr)
 
       if (branch != ' ')
         {
+          // If the target isn't already labelled we'll create one ourselves.
           // N.B. With jumps, branches and calls the target address is always
           // given by the last operand.
+          if (!vars->by_addr.search(rom, operand, -1, -1, i))
+            {
+              if (branch == 'c')
+                snprintf(label, sizeof(label)-1, "%s%u", ".func", func_index++);
+              else if (operand <= addr)
+                snprintf(label, sizeof(label)-1, "%s%u", ".loop", loop_index++);
+              else
+                snprintf(label, sizeof(label)-1, "%s%u", ".label", label_index++);
+
+              v = new cl_var(label, rom, operand, chars("[analyze]"), -1, -1);
+              v->init();
+              vars->add(v);
+            }
+
           analyze(operand);
+
           if (branch == 'j')
             return;
         }

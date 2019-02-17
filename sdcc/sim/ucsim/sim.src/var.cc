@@ -202,6 +202,37 @@ cl_var_list::add(cl_var *item)
       max_name_len = l;
     }
 
+  // If analyze put a variable at this location in the past it is no
+  // longer needed and can be removed.
+  t_index i;
+  if (by_addr.search(item->mem, item->addr, item->bitnr_high, item->bitnr_low, i))
+    {
+      class cl_var *v;
+      while (i < by_addr.count && (v = by_addr.at(i)) &&
+             v->mem == item->mem && v->addr == item->addr &&
+             v->bitnr_high == item->bitnr_high && v->bitnr_low == item->bitnr_low)
+        {
+          if (!strcmp(v->desc, "[analyze]"))
+            {
+              by_addr.disconn_at(i);
+
+              t_index j;
+              if (by_name.search(v->get_name(), j))
+                by_name.disconn_at(j);
+
+              if ((int)strlen(v->get_name()) == max_name_len)
+                max_name_len = -1;
+
+              delete v;
+
+              // There should be at most 1.
+              break;
+            }
+          else
+            i++;
+        }
+    }
+
   by_name.add(item);
   by_addr.add(item);
 }
