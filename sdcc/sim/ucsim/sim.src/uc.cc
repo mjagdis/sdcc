@@ -852,6 +852,12 @@ cl_uc::build_cmdset(class cl_cmdset *cmdset)
   cmdset->add(cmd= new cl_var_cmd("var", 0));
   cmd->init();
   cmd->add_name("variable");
+
+  cmdset->add(cmd= new cl_analyze_cmd("analyze", 0,
+"analyze [addr]\n"
+"                   Analyze code, create labels, check reachability\n",
+"long help of analyze"));
+  cmd->init();
 }
 
 
