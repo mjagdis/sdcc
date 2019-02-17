@@ -197,7 +197,7 @@ cl_irqs::key_of(void *item)
 }
 
 int
-cl_irqs::compare(void *key1, void *key2)
+cl_irqs::compare(const void *key1, const void *key2)
 {
   int *k1= (int*)key1, *k2= (int*)key2;
 

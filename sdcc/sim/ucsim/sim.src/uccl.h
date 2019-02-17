@@ -178,7 +178,7 @@ class cl_cdb_recs: public cl_sorted_list
  cl_cdb_recs(): cl_sorted_list(2,2,"cdb_recs_list") {}
   virtual void *key_of(void *item)
   { return (char*)(((cl_cdb_rec *)item)->fname); }
-  virtual int compare(void *k1, void *k2) {
+  virtual int compare(const void *k1, const void *k2) {
     return strcmp((char*)k1,(char*)k2);
   }
   virtual cl_cdb_rec *rec(chars n) {

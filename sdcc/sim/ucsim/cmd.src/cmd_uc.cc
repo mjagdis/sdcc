@@ -726,6 +726,8 @@ COMMAND_DO_WORK_UC(cl_var_cmd)
     }
   else if (cmdline->syntax_match(uc, STRING))
     {
+      uc->vars->del(params[0]->value.string.string);
+      return false;
     }
   else
     return syntax_error(con), false;
@@ -747,10 +749,6 @@ COMMAND_DO_WORK_UC(cl_var_cmd)
     return con->dd_printf("max bit number is %d\n", (int)sizeof(t_mem)*8),
       false;
 
-  if (uc->symbol2address(params[0]->value.string.string, NULL, NULL))
-    return con->dd_printf("already exists\n"),
-      false;
-  
   if (m)
     {
       v= new cl_var(params[0]->value.string.string, m, addr, chars(""), bitnr_high, bitnr_low);

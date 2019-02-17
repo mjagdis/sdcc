@@ -2626,7 +2626,7 @@ cl_decoder_list::key_of(void *item)
 }
 
 int
-cl_decoder_list::compare(void *key1, void *key2)
+cl_decoder_list::compare(const void *key1, const void *key2)
 {
   t_addr k1= *((t_addr*)key1), k2= *((t_addr*)key2);
   if (k1 == k2)

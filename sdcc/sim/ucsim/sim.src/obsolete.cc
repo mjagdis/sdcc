@@ -61,7 +61,7 @@ cl_memloc_coll::key_of(void *item)
 }*/
 
 /*int
-cl_memloc_coll::compare(void *key1, void *key2)
+cl_memloc_coll::compare(const void *key1, const void *key2)
 {
   if (*(long*)key1 > *(long*)key2)
     return(1);

@@ -761,7 +761,7 @@ cl_sorted_list::add(void *item)
  */
 
 bool
-cl_sorted_list::search(void *key, t_index &index)
+cl_sorted_list::search(const void *key, t_index &index)
 {
   t_index l  = 0;
   t_index h  = count - 1;
@@ -820,9 +820,9 @@ cl_strings::~cl_strings(void) {}
  */
 
 int
-cl_strings::compare(void *key1, void *key2)
+cl_strings::compare(const void *key1, const void *key2)
 {
-  return(strcmp((char *)key1, (char *)key2));
+  return(strcmp((const char *)key1, (const char *)key2));
 }
 
 
@@ -864,7 +864,7 @@ cl_ustrings::~cl_ustrings(void) {}
  */
 
 int
-cl_ustrings::compare(void *key1, void *key2)
+cl_ustrings::compare(const void *key1, const void *key2)
 {
   return(-1);
 }

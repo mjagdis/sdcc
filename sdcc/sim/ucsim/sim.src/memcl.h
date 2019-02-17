@@ -569,7 +569,7 @@ public:
   cl_decoder_list(t_index alimit, t_index adelta, bool bychip);
 
   virtual void *key_of(void *item);
-  virtual int compare(void *key1, void *key2);
+  virtual int compare(const void *key1, const void *key2);
 };
 
 
