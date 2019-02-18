@@ -732,10 +732,6 @@ COMMAND_DO_WORK_UC(cl_var_cmd)
   else
     return syntax_error(con), false;
 
-  if (!valid_sym_name(params[0]->value.string.string))
-    return con->dd_printf("name is invalid\n"),
-      false;
-  
   if (m)
     if (!m->is_address_space())
       return con->dd_printf("%s is not address space\n", m->get_name()),

@@ -275,25 +275,6 @@ strend(char *search_in, char *what)
 }
 
 bool
-valid_sym_name(char *s)
-{
-  if (!s || !*s)
-    return false;
-  if (!isalpha(*s) &&
-      (*s != '_'))
-    return false;
-  char *p= s+1;
-  for (; *p; p++)
-    {
-      if (!isalnum(*p) &&
-	  (*p != '_'))
-	return false;
-    }
-  return true;
-}
-
-
-bool
 is_hex_file(class cl_f *f)
 {
   char *n;
