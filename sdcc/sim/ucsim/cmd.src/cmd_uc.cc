@@ -713,6 +713,26 @@ COMMAND_DO_WORK_UC(cl_var_cmd)
       m= params[1]->value.memory.memory;
       addr= params[2]->value.address;
     }
+  else if (cmdline->syntax_match(uc, STRING STRING))
+    {
+      t_index i;
+
+      if (uc->vars->by_name.search(params[1]->value.string.string, i))
+        {
+          class cl_var *v = uc->vars->by_name.at(i);
+
+          v= new cl_var(params[0]->value.string.string, v->mem, v->addr, chars(""), v->bitnr_high, v->bitnr_low);
+          v->init();
+          uc->vars->add(v);
+
+          uc->vars->del(params[1]->value.string.string);
+
+          return false;
+        }
+      else
+        return con->dd_printf("%s is not a known variable\n", params[1]->value.string.string),
+	  false;
+    }
   else if (cmdline->syntax_match(uc, STRING BIT))
     {
       m= params[1]->value.bit.mem;

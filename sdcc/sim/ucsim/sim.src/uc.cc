@@ -853,10 +853,7 @@ cl_uc::build_cmdset(class cl_cmdset *cmdset)
   cmd->init();
   cmd->add_name("variable");
 
-  cmdset->add(cmd= new cl_analyze_cmd("analyze", 0,
-"analyze [addr]\n"
-"                   Analyze code, create labels, check reachability\n",
-"long help of analyze"));
+  cmdset->add(cmd= new cl_analyze_cmd("analyze", 0));
   cmd->init();
 }
 
