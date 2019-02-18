@@ -109,7 +109,7 @@ COMMAND_DO_WORK_UC(cl_set_mem_cmd)
               for (int i= bitnr_low; i <= bitnr_high; mask |= 1U << i++);
               mem->write(start, (mem->get(start) & (~mask)) | ((array[0] << bitnr_low) & mask));
               uc->check_errors();
-              mem->dump(start, bitnr_high, bitnr_low, con->get_fout());
+              mem->dump(con, start, bitnr_high, bitnr_low);
             }
         }
       else
@@ -121,7 +121,7 @@ COMMAND_DO_WORK_UC(cl_set_mem_cmd)
                i++, addr++)
             mem->write(addr, array[i]);
           uc->check_errors();
-          mem->dump(start, start+len-1, 8, con->get_fout());
+          mem->dump(con, start, start+len-1, 8);
         }
     }
   else

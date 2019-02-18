@@ -263,10 +263,10 @@ COMMAND_DO_WORK_UC(cl_dump_cmd)
 	     params[0]->as_bit(uc))
 	{
           if (!fmt)
-	    params[0]->value.bit.mem->dump(params[0]->value.bit.mem_address,
+	    params[0]->value.bit.mem->dump(con,
+                                           params[0]->value.bit.mem_address,
                                            params[0]->value.bit.bitnr_high,
-                                           params[0]->value.bit.bitnr_low,
-                                           con->get_fout());
+                                           params[0]->value.bit.bitnr_low);
           else
             con->dd_printf("Format options may not be specified for bits\n");
 
@@ -329,13 +329,13 @@ COMMAND_DO_WORK_UC(cl_dump_cmd)
   switch (fmt)
     {
       case 0: // default
-        mem->dump(1, start, end, bpl, con->get_fout());
+        mem->dump(con, 1, start, end, bpl);
         break;
       case 'b': // binary
         mem->dump_b(start, end, bpl, con->get_fout());
         break;
       case 'h': // hex
-        mem->dump(0, start, end, bpl, con->get_fout());
+        mem->dump(con, 0, start, end, bpl);
         break;
       case 'i': // ihex
         mem->dump_i(start, end, 32, con->get_fout());
@@ -645,7 +645,7 @@ cl_where_cmd::do_real_work(class cl_uc *uc,
     bool found= mem->search_next(case_sensitive, array, len, &addr);
     while (found)
       {
-	mem->dump(0, addr, addr+len-1, -1, con->get_fout());
+	mem->dump(con, 0, addr, addr+len-1, -1);
 	addr++;
 	found= mem->search_next(case_sensitive, array, len, &addr);
       }
