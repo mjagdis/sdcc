@@ -208,7 +208,7 @@ CMDHELP(cl_reset_cmd,
 //		     class cl_cmdline *cmdline, class cl_console *con)
 COMMAND_DO_WORK_UC(cl_dump_cmd)
 {
-  class cl_memory *mem= 0;
+  class cl_memory *mem= uc->rom;
   t_addr start = -1, end = -1;
   long bpl= 8;
 
@@ -277,7 +277,7 @@ COMMAND_DO_WORK_UC(cl_dump_cmd)
 	syntax_error(con);
       return false;
     }
-  
+
   if (params[0] == 0)
     ;
   else if (cmdline->syntax_match(uc, BIT)) {
