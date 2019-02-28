@@ -970,6 +970,24 @@ cl_stm8::analyze(t_addr addr)
       label_index = 1;
       loop_index = 1;
 
+      for (i = 0; i < it_sources->count; i++)
+        {
+          class cl_it_src *is= (class cl_it_src *)(it_sources->at(i));
+
+          operand = (rom->get(is->addr+immed_offset+1)<<16) |
+                    (rom->get(is->addr+immed_offset+2)<<8) |
+                    (rom->get(is->addr+immed_offset+3));
+
+          t_index var_i;
+          if (rom->get(operand) != 0x80 && !vars->by_addr.search(rom, operand, -1, -1, var_i))
+            {
+              snprintf(label, sizeof(label)-1, ".isr_%s", is->get_name());
+              v = new cl_var(label, rom, operand, chars("[analyze]"), -1, -1);
+              v->init();
+              vars->add(v);
+            }
+        }
+
       // We could also just iterate through the interrupt table and
       // call analyze on each target address. But there's nothing
       // to stop you using unused vector space for code. Of course,

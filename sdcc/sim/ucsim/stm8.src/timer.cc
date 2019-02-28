@@ -364,7 +364,7 @@ cl_tim::init(void)
       arrl = register_cell(uc->rom, base+offset++);
     }
 
-  chars desc = cchars(get_name()) + chars(" update");
+  chars desc = cchars(get_name()) + chars("_update");
   class cl_it_src *is;
   uc->it_sources->add(is = new cl_it_src(uc, irqnr,
                                          ier, uie,

@@ -207,19 +207,19 @@ cl_serial::init(void)
 					cr2, UART_CR2_TIEN,
 					sr, UART_SR_TXE,
 					0x8008+txit*4, false, false,
-					chars("", "usart%d transmit register empty", id), 20*10+1));
+					chars("", "USART%d_TXE", id), 20*10+1));
   is->init();
   uc->it_sources->add(is= new cl_it_src(uc, txit,
 					cr2, UART_CR2_TCIEN,
 					sr, UART_SR_TC,
 					0x8008+txit*4, false, false,
-					chars("", "usart%d transmit complete", id), 20*10+2));
+					chars("", "USART%d_TC", id), 20*10+2));
   is->init();
   uc->it_sources->add(is= new cl_it_src(uc, rxit,
 					cr2, UART_CR2_RIEN,
 					sr, UART_SR_RXNE,
 					0x8008+rxit*4, false, false,
-					chars("", "usart%d receive", id), 20*10+3));
+					chars("", "USART%d_RX", id), 20*10+3));
   is->init();
 
   sr_read= false;
