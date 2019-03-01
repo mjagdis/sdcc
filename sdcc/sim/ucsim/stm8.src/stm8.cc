@@ -1015,6 +1015,9 @@ cl_stm8::analyze(t_addr addr)
       if (branch == 'r' || branch == '!')
         return;
 
+      const char *var_name = NULL;
+      const char *suffix = "";
+
       for (const char *b = mnemonic; *b; b++)
         {
           if (b[0] == '%' && b[1])
@@ -1034,6 +1037,28 @@ cl_stm8::analyze(t_addr addr)
                   case 'd': // d    direct addressing
                   case 's': // s    signed byte immediate
                     ++immed_offset;
+                    break;
+
+                  case 'B': // B    bit number
+                    {
+                      t_index var_i;
+                      uint bit = (rom->get(addr+1) & 0xf) >> 1;
+                      if (vars->by_addr.search(rom, operand, bit, bit, var_i))
+                        var_name= vars->by_addr.at(var_i)->get_name();
+                      else
+                        switch (bit)
+                          {
+                            default:
+                            case 0: var_name= "bit0"; break;
+                            case 1: var_name= "bit1"; break;
+                            case 2: var_name= "bit2"; break;
+                            case 3: var_name= "bit3"; break;
+                            case 4: var_name= "bit4"; break;
+                            case 5: var_name= "bit5"; break;
+                            case 6: var_name= "bit6"; break;
+                            case 7: var_name= "bit7"; break;
+                          }
+                    }
                     break;
 
                   case 'e': // e    extended 24bit immediate operand
@@ -1071,16 +1096,53 @@ cl_stm8::analyze(t_addr addr)
           // If the target isn't already labelled we'll create one ourselves.
           // N.B. With jumps, branches and calls the target address is always
           // given by the last operand.
-          if (!vars->by_addr.search(rom, operand, -1, -1, i))
+          t_index var_i;
+          if (!vars->by_addr.search(rom, operand, rom->width, 0, var_i) &&
+              !vars->by_addr.search(rom, operand, -1, -1, var_i))
             {
-              if (branch == 'c')
-                snprintf(label, sizeof(label)-1, "%s%u", ".func", func_index++);
-              else if (operand <= addr)
-                snprintf(label, sizeof(label)-1, "%s%u", ".loop", loop_index++);
-              else
-                snprintf(label, sizeof(label)-1, "%s%u", ".label", label_index++);
+              switch (branch)
+                {
+                  case '@':
+                    var_name = "func";
+                    break;
 
-              v = new cl_var(label, rom, operand, chars("[analyze]"), -1, -1);
+                  case 't':
+                  case 'f':
+                    suffix = (branch == 't' ? "_isset" : "_unset");
+                    break;
+
+                  case 'H':
+                    var_name = "half_carry"; break;
+                  case 'h':
+                    var_name = "no_half_carry"; break;
+
+                  case 'I':
+                    var_name = "interrupt_pending"; break;
+                  case 'i':
+                    var_name = "no_interrupt_pending"; break;
+
+                  case 'V':
+                    var_name = "overflow"; break;
+                  case 'v':
+                    var_name = "no_overflow"; break;
+
+                  default:
+                    if (operand <= addr)
+                      var_name = "loop";
+                    else
+                      var_name = "label";
+                    break;
+                }
+
+              int index = 1;
+              do
+                {
+                  snprintf(label, sizeof(label)-1, ".%s%s$%u", var_name, suffix, index++);
+                  label[sizeof(label) - 1] = '\0';
+                }
+              while (vars->by_name.search(label, var_i));
+
+              class cl_var *v = new cl_var(label, rom, operand, chars("[analyze]"), -1, -1);
               v->init();
               vars->add(v);
             }
