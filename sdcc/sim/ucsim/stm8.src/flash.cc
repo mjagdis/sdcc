@@ -554,11 +554,59 @@ cl_saf_flash::registration(void)
 {
   class cl_it_src *is;
 
+  hwreg(uc->rom, base+0, "CR1", "Flash control register 1",
+    "HALT",  3, 3, "Power-down in Halt mode",
+    "AHALT", 2, 2, "Power-down in Active-halt mode",
+    "IE",    1, 1, "Flash Interrupt enable",
+    "FIX",   0, 0, "Fixed Byte programming time",
+    NULL);
   cr1r= register_cell(uc->rom, base+0);
+
+  hwreg(uc->rom, base+1, "CR2", "Flash control register 2",
+    "OPT",   7, 7, "Write option bytes",
+    "WPRG",  6, 6, "Word programming",
+    "ERASE", 5, 5, "Block erasing",
+    "FPRG",  4, 4, "Fast block programming",
+    "PRG",   0, 0, "Standard block programming",
+    NULL);
   cr2r= register_cell(uc->rom, base+1);
+
+  hwreg(uc->rom, base+2, "NCR2", "Flash complementary control register 2",
+    "NOPT",   7, 7, "Write option bytes",
+    "NWPRG",  6, 6, "Word programming",
+    "NERASE", 5, 5, "Block erasing",
+    "NFPRG",  4, 4, "Fast block programming",
+    "NPRG",   0, 0, "Standard block programming",
+    NULL);
   ncr2r= register_cell(uc->rom, base+2);
+
+  hwreg(uc->rom, base+3, "FPR", "Flash protection register",
+    "WPB", 5, 0, "User boot code area protection bits",
+    NULL);
+  //fpr= register_cell(uc->rom, base+3);
+
+  hwreg(uc->rom, base+4, "NFPR", "Flash protection register",
+    "NWPB", 5, 0, "User boot code area protection bits",
+    NULL);
+  //nfpr= register_cell(uc->rom, base+3);
+
+  hwreg(uc->rom, base+5, "IAPSR", "Flash status register",
+    "HVOFF",     6, 6, "End of high voltage flag",
+    "DUL",       3, 3, "Data EEPROM area unlocked flag",
+    "EOP",       2, 2, "End of programming (write or erase operation) flag",
+    "PUL",       1, 1, "Flash Program memory unlock flag",
+    "WR_PG_DIS", 0, 0, "Write attempted to protected page flag",
+    NULL);
   iapsr= register_cell(uc->rom, base+5);
+
+  hwreg(uc->rom, base+8, "PUKR", "Flash program memory unprotecting key register",
+    "PUK", 7, 0, "Main program memory unlock keys",
+    NULL);
   pukr= register_cell(uc->rom, base+8);
+
+  hwreg(uc->rom, base+10, "DUKR", "Data EEPROM unprotection key register",
+    "DUK", 7, 0, "Data EEPROM write unlock keys",
+    NULL);
   dukr= register_cell(uc->rom, base+10);
 
   uc->it_sources->add(is= new cl_it_src(uc, 24,
@@ -587,12 +635,39 @@ cl_l_flash::registration(void)
 {
   class cl_it_src *is;
 
+  hwreg(uc->rom, base+0, "CR1", "Flash control register 1",
+    "IE",    1, 1, "Flash Interrupt enable",
+    "FIX",   0, 0, "Fixed Byte programming time",
+    NULL);
   cr1r= register_cell(uc->rom, base+0);
+
+  hwreg(uc->rom, base+1, "CR2", "Flash control register 2",
+    "OPT",   7, 7, "Write option bytes",
+    "WPRG",  6, 6, "Word programming",
+    "ERASE", 5, 5, "Block erasing",
+    "FPRG",  4, 4, "Fast block programming",
+    "PRG",   0, 0, "Standard block programming",
+    NULL);
   cr2r= register_cell(uc->rom, base+1);
-  pukr= register_cell(uc->rom, base+2);
-  dukr= register_cell(uc->rom, base+3);
-  iapsr= register_cell(uc->rom, base+4);
   ncr2r= NULL;
+
+  hwreg(uc->rom, base+2, "PUKR", "Flash program memory unprotecting key register",
+    "PUK", 7, 0, "Main program memory unlock keys",
+    NULL);
+  pukr= register_cell(uc->rom, base+2);
+
+  hwreg(uc->rom, base+3, "DUKR", "Data EEPROM unprotection key register",
+    "DUK", 7, 0, "Data EEPROM write unlock keys",
+    NULL);
+  dukr= register_cell(uc->rom, base+3);
+
+  hwreg(uc->rom, base+4, "IAPSR", "Flash status register",
+    "DUL",       3, 3, "Data EEPROM area unlocked flag",
+    "EOP",       2, 2, "End of programming (write or erase operation) flag",
+    "PUL",       1, 1, "Flash Program memory unlock flag",
+    "WR_PG_DIS", 0, 0, "Write attempted to protected page flag",
+    NULL);
+  iapsr= register_cell(uc->rom, base+4);
   
   uc->it_sources->add(is= new cl_it_src(uc, 1,
 					cr1r,0x02,
