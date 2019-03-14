@@ -503,10 +503,14 @@ cl_stm8::mk_hw_elements(void)
       add_hw(flash_ctrl= new cl_saf_flash(this, 0x505a));
       flash_ctrl->init();
     }
-  else if (type->subtype & (DEV_STM8ALL |
-			    DEV_STM8L101))
+  else if (type->subtype & (DEV_STM8ALL))
     {
       add_hw(flash_ctrl= new cl_l_flash(this, 0x5050));
+      flash_ctrl->init();
+    }
+  else if (type->subtype & (DEV_STM8L101))
+    {
+      add_hw(flash_ctrl= new cl_l101_flash(this, 0x5050));
       flash_ctrl->init();
     }
   //add_hw(h= new cl_tim235(this, 3, 0x5320));

@@ -39,21 +39,39 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 t_mem
 cl_flash_cell::write(t_mem val)
 {
-  if (flags & CELL_READ_ONLY)
+  class cl_stm8 *uc= (cl_stm8 *)(application->get_uc());
+
+  if (uc && uc->flash_ctrl)
     {
-      class cl_stm8 *uc= (cl_stm8 *)(application->get_uc());
-      if (uc)
-	{
-	  t_addr a;
-	  if (uc->rom->is_owned(this, &a) &&
-	      uc->flash_ctrl)
-	    {
-	      uc->flash_ctrl->flash_write(a, val);
-	      return d();
-	    }
-	}
+      enum stm8_flash_state state= uc->flash_ctrl->get_state();
+      if (state == fs_powerdown)
+        uc->flash_ctrl->wakeup();
+
+      if (flags & CELL_READ_ONLY)
+        {
+          t_addr a;
+          if (uc->rom->is_owned(this, &a))
+            {
+              uc->flash_ctrl->flash_write(a, val);
+              return d();
+            }
+        }
     }
   return cl_cell8::write(val);
+}
+
+t_mem
+cl_flash_cell::read(void)
+{
+  class cl_stm8 *uc= (cl_stm8 *)(application->get_uc());
+  if (uc && uc->flash_ctrl)
+    {
+      enum stm8_flash_state state= uc->flash_ctrl->get_state();
+      if (state == fs_powerdown)
+        uc->flash_ctrl->wakeup();
+    }
+
+  return cl_cell8::read();
 }
 
 cl_flash_as::cl_flash_as(const char *id, t_addr astart, t_addr asize):
@@ -497,6 +515,12 @@ cl_flash::start_program(enum stm8_flash_state start_state)
   start_time= uc->get_rtime();
 }
 
+void
+cl_flash::wakeup(void)
+{
+  state= fs_wait_mode;
+}
+
 const char *
 cl_flash::state_name(enum stm8_flash_state s)
 {
@@ -507,6 +531,7 @@ cl_flash::state_name(enum stm8_flash_state s)
     case fs_pre_erase: return "erase";
     case fs_program: return "program";
     case fs_busy: return "busy";
+    case fs_powerdown: return "power-down";
     }
   return "unknown";
 }
@@ -623,15 +648,15 @@ cl_saf_flash::registration(void)
 }
 
 
-/* L,L101 */
+/* L101 */
 
-cl_l_flash::cl_l_flash(class cl_uc *auc, t_addr abase):
+cl_l101_flash::cl_l101_flash(class cl_uc *auc, t_addr abase):
 	cl_flash(auc, abase, "flash")
 {
 }
 
 void
-cl_l_flash::registration(void)
+cl_l101_flash::registration(void)
 {
   class cl_it_src *is;
 
@@ -680,6 +705,49 @@ cl_l_flash::registration(void)
 					0x8008+1*4, false, false,
 					chars("write attempted to protected page"), 20*20+1));
   is->init();
+}
+
+
+/* AL and L */
+
+cl_l_flash::cl_l_flash(class cl_uc *auc, t_addr abase):
+  cl_l101_flash(auc, abase)
+{
+}
+
+void
+cl_l_flash::registration(void)
+{
+  cl_l101_flash::registration();
+
+  hwreg("CR1",
+    "EEPM",  3, 3, "Flash program and data EEPROM I_DDQ mode selection during run, low power run and low power wait mode",
+    "WAITM", 2, 2, "Flash program and data EEPROM I_DDQ mode during wait mode",
+    NULL);
+}
+
+void
+cl_l_flash::write(class cl_memory_cell *cell, t_mem *val)
+{
+  // RM0031 3.9.1: Setting EEPM forces the flash and data EEPROM into I_DDQ mode.
+  if (cell == cr1r && (cr1r->get() & 0x08))
+    state= fs_powerdown;
+
+  cl_flash::write(cell, val);
+}
+
+void
+cl_l_flash::wakeup(void)
+{
+  cl_flash::wakeup();
+
+  // RM0031 3.9.1: EEPM is cleared by hardware just after a FLash or data EEPROM
+  // memory access.
+  // We actually do it before the access in the code but at the same simulation
+  // time as the access and after the wakeup.
+  t_mem cr1v = cr1r->get();
+  if ((cr1v & 0x08))
+    cr1r->write(cr1v & (~0x08));
 }
 
 
