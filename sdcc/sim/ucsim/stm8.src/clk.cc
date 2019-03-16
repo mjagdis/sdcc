@@ -476,6 +476,68 @@ cl_clk_saf::write(class cl_memory_cell *cell, t_mem *val)
   cl_clk::write(cell, val);
 }
 
+void
+cl_clk_saf::halt(void)
+{
+  // RM0016 10.2.2: The MCU enters Halt mode when a HALT instruction is executed with
+  // the AWU is disabled. The master clock and main voltage regulator are both off.
+  // RM0016 10.2.3: If the AWU is enabled then Active-halt mode is entered instead
+  // and the LSI RC or HSE oscillator is kept running to drive the AWU counters and
+  // IWD counter if enabled. The MVR is kept on unless REGAH is set in CLK_ICKR.
+  if (0)
+    {
+      ickr->write(ickr->get() & (~(CLK_ICKR_HSIRDY | CLK_ICKR_LSIRDY)));
+    }
+  else
+    {
+      // FIXME: need to check whether to keep LSI or HSE running.
+      ickr->write(ickr->get() & (~(CLK_ICKR_HSIRDY)));
+    }
+}
+
+void
+cl_clk_saf::restart_after_halt(void)
+{
+  class cl_stm8 *stm8 = (cl_stm8 *)uc;
+
+  // If AWU is disabled or REGAH is set in CLK_ICKR the main voltage
+  // regulator (MVR) needs to be turned back on before anything else happens.
+  if (0 || (ickr->get() & CLK_ICKR_REGAH))
+    {
+      // STM8S003F3 datasheet, table 29, 48µs total with MVR off, 1µs total with MVR on.
+      // STM8S003F3 datasheet, table 34, gives HSI wakeup of 1µs
+      // Therefore MVR start time is 47µs.
+      stm8->tick_stall(0.000047);
+    }
+
+  // If FHWU is set in ICKR then wake up from halt switches to HSI.
+  if (ickr && (ickr->get() & CLK_ICKR_FHWU) && cmsr->get() != CLK_SOURCE_HSI)
+    set_osc(CLK_SOURCE_HSI);
+
+  // Now the time required for oscillator start up.
+  t_mem val = cmsr->get();
+  if (val == CLK_SOURCE_HSE)
+    {
+      // FIXME: If IWD is enabled HSE remained on so is not restarting.
+      // STM8S003F3 datasheet, table 33, 1ms typical but varying based on crystal manufacturer.
+      stm8->tick_stall(0.001);
+    }
+  else if (val == CLK_SOURCE_HSI)
+    {
+      // STM8S003F3 datasheet, table 34, 1µs max
+      stm8->tick_stall(0.000001);
+    }
+  else if (val == CLK_SOURCE_LSI)
+    {
+      // If AWU is enabled LSI remained on so is not restarting.
+      if (0)
+        {
+          // STM8S003F3 datasheet, table 35.
+          stm8->tick_stall(0.000007);
+        }
+    }
+}
+
 bool
 cl_clk_saf::tim(int id, t_mem *val)
 {
@@ -707,6 +769,9 @@ cl_clk_all::reset(void)
   pckenr2->write(0x80);
   pckenr3->write(0x00);
 
+  // STM8L050J3 datasheet, table 33, 3.7µs typ. 6µs max
+  class cl_stm8 *stm8 = (cl_stm8 *)uc;
+  stm8->tick_stall(0.0000037);
   set_osc(CLK_SOURCE_HSI);
 }
 
@@ -799,6 +864,96 @@ cl_clk_all::write(class cl_memory_cell *cell, t_mem *val)
   cl_clk::write(cell, val);
 }
 
+void
+cl_clk_all::halt(void)
+{
+  // RM0031 7.8: In this mode the system clock is stopped. The HSI clock is not stopped
+  // if used by SWIM. The system clock source is not stopped if a Flash/Data EEPROM
+  // write operation is in progress. The LSI clock is not stopped if used by the SWIM,
+  // the IWDG or if the "IWDG_HALT" option bit is disabled.
+  // RM0031 7.9: Active-halt mode. Only oscillator or LSE crystal is running to
+  // drive the SWIM, beeper, IWDG, RTC and LCD if enabled.
+  // FIXME: missing checks to determine what to keep running here.
+  t_mem eckr_val = eckr->get();
+  t_mem ickr_val = ickr->get();
+
+  eckr_val &= (~(CLK_ECKR_HSERDY | CLK_ECKR_LSERDY));
+  ickr_val &= (~(CLK_ICKR_HSIRDY | CLK_ICKR_LSIRDY));
+
+  eckr->write(eckr_val);
+  ickr->write(ickr_val);
+}
+
+void
+cl_clk_all::restart_after_halt(void)
+{
+  class cl_stm8 *stm8 = (cl_stm8 *)uc;
+
+  // If RTC is disabled the main voltage regulator (MVR) needs
+  // to be turned back on before anything else happens.
+  // FIXME: We should be looking at RTC rather than AWU here.
+  // RM0031 7.8.1: If SAHALT bit is set in the CLK_ICKCR register the main regulator (MVR)
+  // will be switched off without taking into account that some high-speed clock may be used
+  // by the system.
+  if ((ickr->get() & CLK_ICKR_SAHALT))
+    {
+      // STM8L050J3 datasheet, table 24, 4.7µs typ. 7µs max from active-halt including MVR power up.
+      // STM8L050J3 datasheet, table 33, 3.7µs typ. 6µs max HSI oscillator startup
+      // Therefore MVR start up is 1µs.
+      stm8->tick_stall(0.000001);
+
+      // FIXME: if ULP = 0 or FWU = 1 we do NOT need to wait t_VREFINT for
+      // the internal reference voltage start.
+      // STM8L050J3 datasheet, table 46, 2ms typ. 3ms max
+      stm8->tick_stall(0.002);
+    }
+
+  // If FHWU is set in ICKR then wake up from halt switches to HSI.
+  // RM0031 9.14.3: HSI/8 used as system clock source after wakeup from Halt/Active-halt.
+  // FIXME: does CLK_CKDIVR actually get reset to /8?
+  if (ickr && (ickr->get() & CLK_ICKR_FHWU) && cmsr->get() != CLK_SOURCE_HSI)
+    {
+      set_osc(CLK_SOURCE_HSI);
+      ckdivr->write(0x03);
+    }
+
+  // Now the time required for oscillator start up.
+  // FIXME: RM0031 7.8: The system clock source is not stopped if a Flash/Data EEPROM
+  // write operation is in progress.
+  t_mem val = cmsr->get();
+  if (val == CLK_SOURCE_HSE)
+    {
+      // STM8L050J3 datasheet, table 31, 1ms typical but varying based on crystal manufacturer.
+      stm8->tick_stall(0.001);
+    }
+  else if (val == CLK_SOURCE_HSI)
+    {
+      // FIXME: RM0031 7.8: The HSI clock is not stopped if used by SWIM.
+      // STM8L050J3 datasheet, table 33, 3.7µs typ. 6µs max
+      stm8->tick_stall(0.0000037);
+    }
+  else if (val == CLK_SOURCE_LSE)
+    {
+      // FIXME: RM0031 7.9: Only oscillator or the LSE crystal is running to drive the
+      // SWIM, beeper, IWDG, RTC and LCD if enabled.
+      // STM8L051F3 datasheet, table 32, 1s typical but varying based on crystal manufacturer.
+      stm8->tick_stall(1.0);
+    }
+  else if (val == CLK_SOURCE_LSI)
+    {
+      // FIXME: RM0031 7.8.1: The LSI clock is not stopped if used by the SWIM, the IWDG
+      // or if the "IWDG_HALT" option bit is disabled.
+      if (0)
+        {
+          // STM8L050J3 datasheet, table 24, 150µs typ. from active-halt including MVR power up.
+          // STM8L050J3 datasheet, table 26, 150µs typ. from halt including MVR power up.
+          // STM8L050J3 datasheet, table 34, 200µs max LSI wakeup time.
+          // Let's not even worry about the 1µs MVR wake up time above!
+          stm8->tick_stall(0.000150);
+        }
+    }
+}
+
 bool
 cl_clk_all::tim(int id, t_mem *val)
 {
@@ -877,6 +1032,18 @@ cl_clk_l101::reset(void)
   ckdivr->write(0x03);
   pckenr1->write(0x00);
   uc->rom->write(base+5, 0x00); //ccor->write(0x00);
+}
+
+void
+cl_clk_l101::restart_after_halt(void)
+{
+  class cl_stm8 *stm8 = (cl_stm8 *)uc;
+
+  // RM0013 9.4: The main voltage regulator (MVR) is always off in halt or active-halt modes
+  // as is HSI (LSI may remain on to drive AWU and/or IWDG).
+  // STM8L101 datasheet, table 20, 4µs typ. 6µs max total including HSI wakeup.
+  //   To adjust for f_CPU other than 16MHz add 1.5(T_freq - T_16MHz)
+  stm8->tick_stall(0.000004 + 1.5 * (1/(uc->xtal / (1 << (ckdivr->get() & 0x03))) - 1/16000000));
 }
 
 bool

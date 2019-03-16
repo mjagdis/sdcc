@@ -89,6 +89,7 @@ public:
   virtual int clock_per_cycle(void);
   virtual int tick(int cycles_cpu);
   virtual int tick_master(int cycles_master);
+  virtual int tick_stall(double seconds);
   virtual int exec_inst(void);
 
   virtual const char *get_disasm_info(t_addr addr,

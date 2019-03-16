@@ -80,10 +80,14 @@ cl_stm8::init(void)
   cl_uc::init(); /* Memories now exist */
 
   // MAIN and IDLE (wait for interrupt) counters are created by default. We also
-  // need HALT (powered down) and, on some variants, WAIT (wait for event).
+  // need HALT (powered down), STALL (stalled waiting for some action to complete)
+  // and, on some variants, WAIT (wait for event).
   class cl_ticker *ticker;
 
   ticker= new cl_ticker("halt", true, ticks->freq, +1, stPD);
+  add_counter(ticker, ticker->get_name());
+
+  ticker= new cl_ticker("stall", true, ticks->freq, +1, stSTALL);
   add_counter(ticker, ticker->get_name());
 
   if (type->type == CPU_STM8L || type->type == CPU_STM8L101)
@@ -1416,6 +1420,23 @@ cl_stm8::tick_master(int cycles_master)
 }
 
 int
+cl_stm8::tick_stall(double seconds)
+{
+  // When ticking for a given duration we assume that whatever caused
+  // the stall will allow us to continue as soon as it is done and
+  // that we do not need to wait for the next tick.
+  // i.e. we only need to account for the ticks that would otherwise
+  // have been missed and so we round down rather than up.
+  enum cpu_state old_state = state;
+  state = stSTALL;
+
+  int ret = tick_master((int)(seconds * xtal));
+
+  state = old_state;
+  return ret;
+}
+
+int
 cl_stm8::exec_inst(void)
 {
   t_mem code;
@@ -2219,6 +2240,8 @@ cl_stm8::exec_inst(void)
                    // interrupt occurs while the CPU is in one of these modes, the latency is reduced.
                    context_save();
 
+                   flash_ctrl->halt();
+                   clk->halt();
                    state = stPD;
 
                    // We back up the PC to the start of the instruction so that a console
@@ -2277,6 +2300,7 @@ cl_stm8::exec_inst(void)
 
                    // PM004 WFE: Interrupt requests [...] are served normally, depending
                    // on the CC.I[1:0] value.
+                   flash_ctrl->wait();
                    state = stWAIT;
 
                    // We back up the PC to the start of the instruction so that a console
@@ -2295,6 +2319,7 @@ cl_stm8::exec_inst(void)
                    // PM004 WFI: The interrupt flag is cleared, allowing interrupts to be fetched.
                    FLAG_CLEAR(BIT_I0);
                    FLAG_SET(BIT_I1);
+                   flash_ctrl->wait();
                    state = stIDLE;
 
                    // We back up the PC to the start of the instruction so that a console
@@ -2439,6 +2464,10 @@ cl_stm8::accept_it(class it_level *il)
   // If we have an interrupt to handle go ahead now.
   if (il)
     {
+      // If we were halted we need to wake up now.
+      if (state == stPD)
+        clk->restart_after_halt();
+
       // RM0016 1.2.1: The WFI/HALT instructions save the context in advance. If an
       // interrupt occurs while the CPU is in one of these modes, the latency is reduced.
       if (state != stIDLE && state != stPD)

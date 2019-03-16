@@ -44,7 +44,7 @@ cl_flash_cell::write(t_mem val)
   if (uc && uc->flash_ctrl)
     {
       enum stm8_flash_state state= uc->flash_ctrl->get_state();
-      if (state == fs_powerdown)
+      if (state == fs_powerdown || state == fs_standby)
         uc->flash_ctrl->wakeup();
 
       if (flags & CELL_READ_ONLY)
@@ -67,7 +67,7 @@ cl_flash_cell::read(void)
   if (uc && uc->flash_ctrl)
     {
       enum stm8_flash_state state= uc->flash_ctrl->get_state();
-      if (state == fs_powerdown)
+      if (state == fs_powerdown || state == fs_standby)
         uc->flash_ctrl->wakeup();
     }
 
@@ -516,8 +516,35 @@ cl_flash::start_program(enum stm8_flash_state start_state)
 }
 
 void
+cl_flash::wait(void)
+{
+}
+
+void
+cl_flash::halt(void)
+{
+  state= fs_powerdown;
+}
+
+void
 cl_flash::wakeup(void)
 {
+  class cl_stm8 *stm8 = (cl_stm8 *)uc;
+
+  // Clocks are running and driving hardware but the CPU is stalled waiting for the
+  // flash to become ready.
+  if (state == fs_powerdown)
+    {
+      // RM0031 3.7: When the Flash program memory and data EEPROM exit from I_DDQ mode,
+      // the recovery time is lower than 2.8µs and depends on supply voltage and temperature.
+      stm8->tick_stall(0.0000028);
+    }
+  else if ((state & fs_standby))
+    {
+      // FIXME: 2ns assumed for flash wakeup from standby.
+      stm8->tick_stall(0.000000002);
+    }
+
   state= fs_wait_mode;
 }
 
@@ -531,6 +558,7 @@ cl_flash::state_name(enum stm8_flash_state s)
     case fs_pre_erase: return "erase";
     case fs_program: return "program";
     case fs_busy: return "busy";
+    case fs_standby: return "standby";
     case fs_powerdown: return "power-down";
     }
   return "unknown";
@@ -647,6 +675,28 @@ cl_saf_flash::registration(void)
   is->init();
 }
 
+void
+cl_saf_flash::halt(void)
+{
+  // Active-halt if AWU/RTC is enabled, Halt otherwise.
+  // FIXME: need to check once AWU/RTC are implemented.
+  if (1)
+    {
+      // Active-halt
+      // RM0016 10.3.2: By default the Flash remains in operating mode. Setting
+      // AHALT in FLASH_CR1 causes the Flash to power-down instead.
+      if ((cr1r->get() & 0x04))
+        state= fs_powerdown;
+    }
+  else
+    {
+      // Halt
+      // RM0016 10.3.1: By default the Flash is in power-down state. Setting HALT
+      // in FLASH_CR1 causes the Flash to go to Standby mode instead.
+      state= ((cr1r->get() & 0x08) ? fs_standby : fs_powerdown);
+    }
+}
+
 
 /* L101 */
 
@@ -734,6 +784,15 @@ cl_l_flash::write(class cl_memory_cell *cell, t_mem *val)
     state= fs_powerdown;
 
   cl_flash::write(cell, val);
+}
+
+void
+cl_l_flash::wait(void)
+{
+  // RM0031 3.9.1: WAITM puts the flash and data EEPROM in I_DDQ mode when the
+  // device is in wait mode.
+  if ((cr1r->get() & 0x04))
+    state= fs_powerdown;
 }
 
 void

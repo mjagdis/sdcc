@@ -67,6 +67,7 @@ enum stm8_flash_state {
   fs_pre_erase= 0x02,
   fs_program= 0x04,
   fs_busy= fs_pre_erase|fs_program,
+  fs_standby= 0x08,
   fs_powerdown= 0x10
 };
 
@@ -119,6 +120,8 @@ class cl_flash: public cl_hw
   virtual void start_program(enum stm8_flash_state start_state);
   virtual void finish_program(bool ok);
 
+  virtual void wait(void);
+  virtual void halt(void);
   virtual void wakeup(void);
 
   virtual const char *state_name(enum stm8_flash_state s);
@@ -129,6 +132,7 @@ class cl_saf_flash: public cl_flash
 {
  public:
   cl_saf_flash(class cl_uc *auc, t_addr abase);
+  virtual void halt(void);
   virtual void registration(void);
 };
 
@@ -144,6 +148,7 @@ class cl_l_flash: public cl_l101_flash
  public:
   cl_l_flash(class cl_uc *auc, t_addr abase);
   virtual void write(class cl_memory_cell *cell, t_mem *val);
+  virtual void wait(void);
   virtual void wakeup(void);
   virtual void registration(void);
 };
