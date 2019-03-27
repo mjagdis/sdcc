@@ -41,7 +41,8 @@ public:
   chars(char *s);
   chars(const char *s);
   chars(const chars &cs);
-  chars(const char *, const char *fmt, ...);
+  chars(const char *, const char *fmt, ...)
+    __attribute__ ((format (printf, 3, 4)));
   virtual ~chars(void);
 private:
   virtual void allocate_string(char *s);
@@ -50,8 +51,10 @@ private:
 public:
   virtual chars &append(char *s);
   virtual chars &append(char c);
-  virtual chars &append(const char *format, ...);
-  virtual chars &format(const char *format, ...);
+  virtual chars &append(const char *format, ...)
+    __attribute__ ((format (printf, 2, 3)));
+  virtual chars &format(const char *format, ...)
+    __attribute__ ((format (printf, 2, 3)));
   virtual bool empty();
   virtual bool is_null();
   virtual int len() { return chars_length; }

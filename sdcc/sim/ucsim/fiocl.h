@@ -181,8 +181,10 @@ class cl_f: public cl_base
   virtual int write(char *buf, int count);
   virtual int write_str(char *s);
   virtual int write_str(const char *s);
-  virtual int vprintf(const char *format, va_list ap);
-  virtual int prntf(const char *format, ...);
+  virtual int vprintf(const char *format, va_list ap)
+    __attribute__ ((format (printf, 2, 0)));
+  virtual int prntf(const char *format, ...)
+    __attribute__ ((format (printf, 2, 3)));
   virtual bool eof(void);
   //virtual void flush(void);
 

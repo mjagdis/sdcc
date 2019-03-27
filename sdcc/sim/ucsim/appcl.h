@@ -124,8 +124,10 @@ protected:
   virtual void mk_options(void);
 
 public: // output functions
-  virtual int dd_printf(const char *format, ...);
-  virtual int debug(const char *format, ...);
+  virtual int dd_printf(const char *format, ...)
+    __attribute__ ((format (printf, 2, 3)));
+  virtual int debug(const char *format, ...)
+    __attribute__ ((format (printf, 2, 3)));
 };
 
 

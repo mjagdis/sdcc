@@ -48,8 +48,10 @@ extern char *get_id_string(struct id_element *ids, int id);
 extern char *get_id_string(struct id_element *ids, int id, char *def);
 extern int get_string_id(struct id_element *ids, char *str);
 extern int get_string_id(struct id_element *ids, char *str, int def);
-extern char *vformat_string(const char *format, va_list ap);
-extern char *format_string(const char *format, ...);
+extern char *vformat_string(const char *format, va_list ap)
+    __attribute__ ((format (printf, 1, 0)));
+extern char *format_string(const char *format, ...)
+    __attribute__ ((format (printf, 1, 2)));
 extern void print_char_octal(char c, FILE *f);
 extern const char *object_name(class cl_base *o);
 extern char *case_string(enum letter_case lcase, char *str);

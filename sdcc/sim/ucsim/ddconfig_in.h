@@ -232,6 +232,10 @@
 /* XXX */
 #undef _M_
 
+#ifndef __GNUC__
+#  define __attribute__(X)
+#endif
+
 /* ucsim custom defines */
 #define DD_TRUE     1
 #define DD_FALSE    0
