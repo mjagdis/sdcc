@@ -233,8 +233,11 @@ cl_mem::read(t_addr addr)
   if (addr >= size)
     {
       //FIXME
-      fprintf(stderr, "Address 0x%06x is over 0x%06x\n",
-	      (int)addr, (int)size);
+      fprintf(stderr, "Address ");
+      fprintf(stderr, addr_format, addr);
+      fprintf(stderr, " is over ");
+      fprintf(stderr, addr_format, size);
+      fprintf(stderr, "\n");
       return(0);
     }
   /*if ((loc= read_locs->get_loc(addr)))
@@ -282,8 +285,9 @@ cl_mem::write(t_addr addr, t_mem val)
     ((TYPE_UWORD*)mem)[addr]= (*val)&mask;
   else
   ((TYPE_UDWORD*)mem)[addr]= (*val)&mask;*/
-  fprintf(stderr, "FIXME cl_mem::write(0x%06x, 0x%04x)\n",
-	  (int)addr, (int)val);
+  fprintf(stderr, "FIXME cl_mem::write(");
+  fprintf(stderr, addr_format, addr);
+  fprintf(stderr, ", 0x%04x)\n", val);
   return(0);
 }
 

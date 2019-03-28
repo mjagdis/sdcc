@@ -77,14 +77,16 @@ cl_vcd::add(class cl_memory *m, t_addr a, class cl_console_base *con)
 {
   if (!m->is_address_space())
     {
-      if (con) con->dd_printf("%s is not an address space\n");
+      if (con) con->dd_printf("%s is not an address space\n", m->get_name());
       return false;
     }
-  if (!m->valid_address(a))
+  if (!m->valid_address(a) && con)
     {
-      if (con) con->dd_printf("Address must be between 0x%x and 0x%x\n",
-			      m->lowest_valid_address(),
-			      m->highest_valid_address());
+      con->dd_printf("Address must be between ");
+      con->dd_printf(m->addr_format, m->lowest_valid_address());
+      con->dd_printf(" and ");
+      con->dd_printf(m->addr_format, m->highest_valid_address());
+      con->dd_printf("\n");
       return false;
     }
   cl_memory_cell *c= ((cl_address_space*)m)->get_cell(a);
@@ -102,14 +104,16 @@ cl_vcd::del(class cl_memory *m, t_addr a, class cl_console_base *con)
 {
   if (!m->is_address_space())
     {
-      if (con) con->dd_printf("%s is not an address space\n");
+      if (con) con->dd_printf("%s is not an address space\n", m->get_name());
       return false;
     }
-  if (!m->valid_address(a))
+  if (!m->valid_address(a) && con)
     {
-      if (con) con->dd_printf("Address must be between 0x%x and 0x%x\n",
-			      m->lowest_valid_address(),
-			      m->highest_valid_address());
+      con->dd_printf("Address must be between ");
+      con->dd_printf(m->addr_format, m->lowest_valid_address());
+      con->dd_printf(" and ");
+      con->dd_printf(m->addr_format, m->highest_valid_address());
+      con->dd_printf("\n");
       return false;
     }
   del(((cl_address_space*)m)->get_cell(a));
@@ -136,16 +140,18 @@ cl_vcd::set_cmd(class cl_cmdline *cmdline, class cl_console_base *con)
       t_addr a= params[1]->value.address;
       if (!mem->is_address_space())
 	{
-	  con->dd_printf("%s is not an address space\n");
+	  con->dd_printf("%s is not an address space\n", mem->get_name());
 	  return;
 	}
       if (!mem->valid_address(a))
-	{
-	  con->dd_printf("Address must be between 0x%x and 0x%x\n",
-			 mem->lowest_valid_address(),
-			 mem->highest_valid_address());
-	  return;
-	}
+        {
+          con->dd_printf("Address must be between ");
+          con->dd_printf(mem->addr_format, mem->lowest_valid_address());
+          con->dd_printf(" and ");
+          con->dd_printf(mem->addr_format, mem->highest_valid_address());
+          con->dd_printf("\n");
+          return;
+        }
       add(mem, a, con);
       return;
     }
@@ -449,7 +455,9 @@ cl_vcd::print_info(class cl_console_base *con)
       cl_address_space *as;
       t_addr a= 0;
       as= uc->address_space(c, &a);
-      con->dd_printf("  %s[0x%x] %s\n", as?(as->get_name()):"?", a, (char*)(uc->cell_name(c)));
+      con->dd_printf("  %s[", (as ? as->get_name() : "?"));
+      con->dd_printf((as ? as->addr_format : uc->rom->addr_format), a);
+      con->dd_printf("] %s\n", (char*)(uc->cell_name(c)));
     }
 }
 

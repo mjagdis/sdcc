@@ -102,11 +102,11 @@ class it_level: public cl_base
 {
 public:
   int level;
-  uint addr;
-  uint PC;
+  t_addr addr;
+  t_addr PC;
   class cl_it_src *source;
 public:
-  it_level(int alevel, uint aaddr, uint aPC, class cl_it_src *is);
+  it_level(int alevel, t_addr aaddr, t_addr aPC, class cl_it_src *is);
 };
 
 

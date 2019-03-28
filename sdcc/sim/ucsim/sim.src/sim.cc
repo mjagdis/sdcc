@@ -178,7 +178,9 @@ cl_sim::stop(int reason, class cl_ev_brk *ebrk)
 	  cmd->frozen_console->input_avail())
 	cmd->frozen_console->read_line();
       cmd->frozen_console->un_redirect();
-      cmd->frozen_console->dd_printf("Stop at 0x%06x: (%d) ", uc->PC, reason);
+      cmd->frozen_console->dd_printf("Stop at ");
+      cmd->frozen_console->dd_printf(uc->rom->addr_format, uc->PC);
+      cmd->frozen_console->dd_printf(": (%d) ", reason);
       switch (reason)
 	{
 	case resHALT:
@@ -238,7 +240,9 @@ cl_sim::stop(int reason, class cl_ev_brk *ebrk)
 	  cmd->frozen_console->dd_printf("Unknown reason\n");
 	  break;
 	}
-      cmd->frozen_console->dd_printf("F 0x%06x\n", uc->PC); // for sdcdb
+      cmd->frozen_console->dd_printf("F "); // for sdcdb
+      cmd->frozen_console->dd_printf(uc->rom->addr_format, uc->PC);
+      cmd->frozen_console->dd_printf("\n");
       unsigned long dt= uc?(uc->ticks->ticks - start_tick):0;
       if ((reason != resSTEP) ||
 	  (steps_done > 1))

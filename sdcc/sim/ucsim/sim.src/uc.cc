@@ -1837,7 +1837,7 @@ cl_uc::symbolic_bit_name(t_addr bit_address,
 {
   //char *sym_name= 0;
   int i;
-  chars c= chars("", mem?(mem->addr_format):"0x%06lx", (unsigned long)mem_addr);
+  chars c= (mem ? chars("", mem->addr_format, mem_addr) : chars("", "0x%06lx", (unsigned long)mem_addr));
   /*if (!sym_name)
     {
       sym_name= (char *)malloc(16);
@@ -1909,7 +1909,7 @@ cl_uc::cell_name(class cl_memory_cell *cell)
   as= address_space(cell, &a);
   if (as == NULL)
     return chars("");
-  return chars("", "%s_%06x", as->get_name(), a);
+  return chars("", "%s_", as->get_name()).append(as->addr_format+2, a);
 }
 
 class cl_var *
@@ -2372,9 +2372,13 @@ cl_uc::do_interrupt(void)
 	  if (ap >= pr)
 	    continue;
 	  is->clear();
-	  sim->app->get_commander()->
-	    debug("%g sec (%d clks): Accepting interrupt `%s' PC= 0x%06x\n",
-			  get_rtime(), ticks->ticks, object_name(is), PC);
+          sim->app->get_commander()->
+            debug("%g sec (%lu clks): Accepting interrupt `%s' PC= ",
+                          get_rtime(), ticks->ticks, object_name(is));
+          sim->app->get_commander()->
+            debug(rom->addr_format, PC);
+          sim->app->get_commander()->
+            debug("\n");
 	  IL= new it_level(pr, is->addr, PC, is);
 	  return(accept_it(IL));
 	}
@@ -2480,12 +2484,13 @@ cl_uc::stack_read(class cl_stack_op *op)
 	  e->init();
 	  error(e);
 	}
-      int top_size= top->data_size(), op_size= op->data_size();
+      t_addr top_size= top->data_size(), op_size= op->data_size();
       if (top_size != op_size)
 	{
-	  application->debug("0x%06x %d bytes to read out of stack "
-			     "but %d was pushed in last operation\n",
-			     (int)op->get_pc(), op_size, top_size);
+	  application->debug(rom->addr_format, op->get_pc());
+	  application->debug(" %lu bytes to read out of stack "
+			     "but %lu was pushed in last operation\n",
+			     op_size, top_size);
 	}
     }
 
@@ -2500,29 +2505,33 @@ cl_uc::stack_read(class cl_stack_op *op)
     }
   if (removed != 1)
     {
-      application->debug("0x%06x %d ops removed from stack-tracker "
-			 "when %s happened, top pc=0x%06x "
-			 "top before=0x%06x op after=0x%06x\n",
-			 (int)op->get_pc(), removed, op->get_op_name(),
-                         top?((int)top->get_pc()):0,
-			 top?((int)top->get_before()):0,
-                         (int)op->get_after());
+      application->debug(rom->addr_format, op->get_pc());
+      application->debug(" %d ops removed from stack-tracker "
+                         "when %s happened, top pc=", removed, op->get_op_name());
+      application->debug(rom->addr_format, (top ? top->get_pc() : 0));
+      application->debug(" top before=");
+      application->debug(rom->addr_format, (top ? top->get_before() : 0));
+      application->debug(" op after=");
+      application->debug(rom->addr_format, op->get_after());
+      application->debug("\n");
     }
 
   if (top)
     {
-      int ta= top->get_after(), oa= op->get_after();
+      t_addr ta= top->get_after(), oa= op->get_after();
       if (ta != oa)
 	{
-	  application->debug("0x%06x stack still inconsistent after %s, "
-			     "%d byte(s) should be read out; top after"
-			     "=0x%06x op after=0x%06x\n",
-			     (int)op->get_pc(),
-			     op->get_op_name(),
-			     abs(ta-oa),
-			     ta, oa);
+          application->debug(rom->addr_format, op->get_pc());
+          application->debug(" stack still inconsistent after %s, "
+                             "%lu byte(s) should be read out; top after=",
+                             op->get_op_name(),
+			     (unsigned long)(ta > oa ? ta - oa : oa - ta));
+          application->debug(rom->addr_format, ta);
+          application->debug(" op after=");
+          application->debug(rom->addr_format, oa);
+          application->debug("\n");
 	  class cl_error *e=
-	    new cl_error_stack_tracker_inconsistent(op, abs(ta-oa));
+	    new cl_error_stack_tracker_inconsistent(op, (ta > oa ? ta - oa : oa - ta));
 	  e->init();
           error(e);
         }
@@ -2715,7 +2724,7 @@ cl_error_unknown_code::print(class cl_commander_base *c)
       /*cmd_fprintf(f,*/c->dd_printf(")");
     }
   else
-    /*cmd_fprintf(f,*/c->dd_printf("0x%06x", PC);
+    /*cmd_fprintf(f,*/c->dd_printf(uc->rom->addr_format, PC);
   /*cmd_fprintf(f,*/c->dd_printf("\n");
 }
 

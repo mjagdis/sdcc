@@ -48,11 +48,13 @@ COMMAND_DO_WORK_UC(cl_info_bp_cmd)
     {
       class cl_brk *fb= (class cl_brk *)(uc->fbrk->at(i));
       const char *s= uc->disass(fb->addr, NULL);
-      con->dd_printf("%-3d %-10s %s %-5d %-5d 0x%06x %-5s %s\n", fb->nr,
-                     "fetch", (fb->perm==brkFIX)?"keep":"del ",
-                     fb->hit, fb->cnt, fb->addr,
-		     fb->condition()?"true":"false",
-		     s);
+      con->dd_printf("%-3d %-10s %s %-5d %-5d ",
+                     fb->nr, "fetch", (fb->perm==brkFIX)?"keep":"del ",
+                     fb->hit, fb->cnt);
+      con->dd_printf(uc->rom->addr_format, fb->addr);
+      con->dd_printf(" %-5s %s\n",
+                     fb->condition()?"true":"false",
+                     s);
       if (!(fb->commands.empty()))
 	con->dd_printf("     %s\n", (char*)(fb->commands));
       free((char *)s);
@@ -60,10 +62,11 @@ COMMAND_DO_WORK_UC(cl_info_bp_cmd)
   for (i= 0; i < uc->ebrk->count; i++)
     {
       class cl_ev_brk *eb= (class cl_ev_brk *)(uc->ebrk->at(i));
-      con->dd_printf("%-3d %-10s %s %-5d %-5d 0x%06x %s\n", eb->nr,
-		     "event", (eb->perm==brkFIX)?"keep":"del ",
-		     eb->hit, eb->cnt,
-		     eb->addr, eb->id);
+      con->dd_printf("%-3d %-10s %s %-5d %-5d ",
+                     eb->nr, "event", (eb->perm==brkFIX)?"keep":"del ",
+                     eb->hit, eb->cnt);
+      con->dd_printf(uc->rom->addr_format, eb->addr);
+      con->dd_printf(" %s\n", eb->id);
       if (!(eb->commands.empty()))
 	con->dd_printf("     %s\n", (char*)(eb->commands));
     }

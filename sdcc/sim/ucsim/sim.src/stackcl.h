@@ -66,7 +66,7 @@ public:
   virtual const char *get_op_name(void);
   virtual const char *get_matching_name(void) { return(cchars("unknown")); }
   virtual bool sp_increased(void);
-  virtual int data_size(void);
+  virtual t_addr data_size(void);
   virtual bool match(class cl_stack_op *op);
   virtual enum stack_op get_op(void) { return(operation); }
   virtual enum stack_op get_matching_op(void) { return(operation); }

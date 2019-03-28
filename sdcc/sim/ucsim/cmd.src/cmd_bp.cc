@@ -171,7 +171,11 @@ cl_break_cmd::do_fetch(class cl_uc *uc,
       return;
     }
   if (uc->fbrk->bp_at(addr))
-    con->dd_printf("Breakpoint at 0x%06x is already set.\n", addr);
+    {
+      con->dd_printf("Breakpoint at ");
+      con->dd_printf(uc->rom->addr_format, addr);
+      con->dd_printf(" is already set.\n");
+    }
   else
     {
       class cl_brk *b= new cl_fetch_brk(uc->rom/*address_space(MEM_ROM_ID)*/,
@@ -181,7 +185,9 @@ cl_break_cmd::do_fetch(class cl_uc *uc,
       b->cond= cond;
       uc->fbrk->add_bp(b);
       const char *s= uc->disass(addr, NULL);
-      con->dd_printf("Breakpoint %d at 0x%06x: %s\n", b->nr, addr, s);
+      con->dd_printf("Breakpoint %d at ", b->nr);
+      con->dd_printf(uc->rom->addr_format, addr);
+      con->dd_printf(": %s\n", s);
       free((char *)s);
     }
 }
@@ -239,7 +245,11 @@ COMMAND_DO_WORK_UC(cl_clear_cmd)
 	return(false);
       addr= param->value.address;
       if (uc->fbrk->bp_at(addr) == 0)
-	con->dd_printf("No breakpoint at 0x%06x\n", addr);
+        {
+          con->dd_printf("No breakpoint at ");
+          con->dd_printf(uc->rom->addr_format, addr);
+          con->dd_printf("\n");
+        }
       else
 	uc->fbrk->del_bp(addr);
     }
@@ -321,11 +331,11 @@ COMMAND_DO_WORK_UC(cl_commands_cmd)
   if (nr < 0)
     nr= uc->brk_counter;
   if (nr == 0)
-    return con->dd_printf("breakpoint (%d) not found\n", nr), false;
+    return con->dd_printf("breakpoint (%ld) not found\n", nr), false;
   
   class cl_brk *b= uc->brk_by_nr(nr);
   if (!b)
-    return con->dd_printf("no breakpoint (%d)\n", nr), false;
+    return con->dd_printf("no breakpoint (%ld)\n", nr), false;
 
   if (!s.empty())
     b->commands= s;

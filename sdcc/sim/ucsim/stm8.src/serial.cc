@@ -422,7 +422,9 @@ cl_serial::set_dr(t_mem val)
 void
 cl_serial::print_info(class cl_console_base *con)
 {
-  con->dd_printf("%s[%d] at 0x%06x %s\n", id_string, id, base, on?"on":"off");
+  con->dd_printf("%s[%d] at ", id_string, id);
+  con->dd_printf(uc->rom->addr_format, base);
+  con->dd_printf(" %s\n", on?"on":"off");
   con->dd_printf("clk %s\n", clk_enabled?"enabled":"disabled");
   con->dd_printf("Input: ");
   class cl_f *fin= io->get_fin(), *fout= io->get_fout();

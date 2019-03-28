@@ -1301,13 +1301,17 @@ cl_uc390::print_regs (class cl_console_base *con)
     {
       /* SA: 10 bit stack */
       start = (sfr->get (R51_ESP) & 3) * 256 + sfr->get (SP);
-      con->dd_printf ("SP10 ", start);
+      con->dd_printf ("SP10= ");
+      con->dd_printf (sfr->addr_format, start);
+      con->dd_printf (" ");
       ixram->dump (start, start - 7, 8, con->get_fout());
     }
   else
     {
       start = sfr->get (SP);
-      con->dd_printf ("SP ", start);
+      con->dd_printf ("SP= ");
+      con->dd_printf (sfr->addr_format, start);
+      con->dd_printf (" ");
       iram->dump (start, start - 7, 8, con->get_fout());
     }
 

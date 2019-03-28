@@ -1249,7 +1249,7 @@ cl_stm8::exec_inst(void)
                break;
             case 0x80: // TRAP
 	       {
-		 class it_level *il= new it_level(3, 0x8004, PC, trap_src);
+		 class it_level *il= new it_level(3, (t_addr)0x8004, PC, trap_src);
 		 accept_it(il);
 	       }
                return(/*resHALT*/resGO);

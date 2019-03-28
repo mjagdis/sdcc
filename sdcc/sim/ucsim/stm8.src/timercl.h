@@ -42,7 +42,7 @@ class cl_tim: public cl_hw
  protected:
   struct
   {
-    int
+    t_addr
     // register indexes
     cr1, // control 1
       cr2, // control 2 (used in Master/Slave timers only, all except SAF 235)

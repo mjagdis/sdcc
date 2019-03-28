@@ -1295,7 +1295,9 @@ cl_51core::print_regs(class cl_console_base *con)
               (data&bmOV)?'1':'0', (data&bmP)?'1':'0');
   /* show stack pointer */
   start = sfr->get (SP);
-  con->dd_printf ("SP ", start);
+  con->dd_printf ("SP= ");
+  con->dd_printf (sfr->addr_format, start);
+  con->dd_printf (" ");
   iram->dump (start, start - 7, 8, con->get_fout());
   // show DPTR(s)
   if (dptr)
@@ -1790,9 +1792,13 @@ cl_51core::do_interrupt(void)
 	      return(resGO);
 	    }
 	  is->clear();
-	  sim->app->get_commander()->
-	    debug("%g sec (%d clks): Accepting interrupt `%s' PC= 0x%06x\n",
-			  get_rtime(), ticks->ticks, object_name(is), PC);
+          sim->app->get_commander()->
+            debug("%g sec (%lu clks): Accepting interrupt `%s' PC= ",
+                  get_rtime(), ticks->ticks, object_name(is));
+          sim->app->get_commander()->
+            debug(sim->uc->rom->addr_format, PC);
+          sim->app->get_commander()->
+            debug("\n");
 	  IL= new it_level(pr, is->addr, PC, is);
 	  return(accept_it(IL));
 	}
@@ -1852,9 +1858,15 @@ cl_51core::idle_pd(void)
   if (pcon & bmIDL)
     {
       if (state != stIDLE)
-	sim->app->get_commander()->
-	  debug("%g sec (%d clks): CPU in Idle mode (PC=0x%x, PCON=0x%x)\n",
-		get_rtime(), ticks->ticks, PC, pcon);
+        {
+          sim->app->get_commander()->
+            debug("%g sec (%lu clks): CPU in Idle mode (PC=",
+                  get_rtime(), ticks->ticks);
+          sim->app->get_commander()->
+            debug(sfr->addr_format, PC);
+          sim->app->get_commander()->
+            debug(", PCON=0x%x)\n", pcon);
+        }
       state= stIDLE;
       //was_reti= 1;
     }
@@ -1862,7 +1874,7 @@ cl_51core::idle_pd(void)
     {
       if (state != stPD)
 	sim->app->get_commander()->
-	  debug("%g sec (%d clks): CPU in PowerDown mode\n",
+	  debug("%g sec (%lu clks): CPU in PowerDown mode\n",
 			get_rtime(), ticks->ticks);
       state= stPD;
     }

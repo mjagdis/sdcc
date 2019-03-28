@@ -65,8 +65,7 @@ cl_flash_as::cl_flash_as(const char *id, t_addr astart, t_addr asize):
   decoders= new cl_decoder_list(2, 2, false);
   cella= (class cl_memory_cell *)malloc(size * sizeof(class cl_memory_cell));
   //cell->init();
-  int i;
-  for (i= 0; i < size; i++)
+  for (t_addr i= 0; i < size; i++)
     {
       void *p= &(cella[i]);
       memcpy(p, cell, sizeof(class cl_memory_cell));
@@ -116,7 +115,9 @@ cl_flash::tick(int cycles)
 	  (elapsed > tprog/2.0))
 	{
 	  int i;
-	  uc->sim->app->debug("FLASH zeroing %06lx .. %d\n", wbuf_start, wbuf_size);
+	  uc->sim->app->debug("FLASH zeroing ");
+	  uc->sim->app->debug(uc->rom->addr_format, wbuf_start);
+	  uc->sim->app->debug(" .. %d\n", wbuf_size);
 	  for (i= 0; i < wbuf_size; i++)
 	    {
 	      class cl_memory_cell *c= uc->rom->get_cell(wbuf_start + i);
@@ -136,7 +137,9 @@ cl_flash::tick(int cycles)
       else if (elapsed > tprog)
 	{
 	  int i;
-	  uc->sim->app->debug("FLASH dl-ing %06lx .. %d\n", wbuf_start, wbuf_size);
+	  uc->sim->app->debug("FLASH dl-ing ");
+	  uc->sim->app->debug(uc->rom->addr_format, wbuf_start);
+	  uc->sim->app->debug(" .. %d\n", wbuf_size);
 	  for (i= 0; i < wbuf_size; i++)
 	    {
 	      class cl_memory_cell *c= uc->rom->get_cell(wbuf_start + i);
@@ -329,7 +332,9 @@ cl_flash::conf_op(cl_memory_cell *cell, t_addr addr, t_mem *val)
 void
 cl_flash::flash_write(t_addr a, t_mem val)
 {
-  uc->sim->app->debug("FLASH wr(%06lx,%02x)\n",a,val);
+  uc->sim->app->debug("FLASH wr(");
+  uc->sim->app->debug(uc->rom->addr_format, a);
+  uc->sim->app->debug(",%02x)\n", val);
   if (!uc)
     {
       uc->sim->app->debug("  no uc\n");
@@ -358,10 +363,14 @@ cl_flash::flash_write(t_addr a, t_mem val)
       return;
     }
 
-  uc->sim->app->debug("  wbuf_start=%06lx\n",wbuf_start);
+  uc->sim->app->debug("  wbuf_start=");
+  uc->sim->app->debug(uc->rom->addr_format, wbuf_start);
+  uc->sim->app->debug("\n");
   if (wbuf_start == 0)
     {
-      uc->sim->app->debug("  calling start_wbuf(%06lx)\n",a);
+      uc->sim->app->debug("  calling start_wbuf(");
+      uc->sim->app->debug(uc->rom->addr_format, a);
+      uc->sim->app->debug(")\n");
       start_wbuf(a);
     }
   
@@ -476,7 +485,11 @@ cl_flash::start_wbuf(t_addr addr)
   wbuf_writes= 0;
   for (i= 0; i < 256; i++)
     wbuf[i]= 0;
-  uc->sim->app->debug("FLASH start_wbuf %06lx (wbuf_start=%06lx,size=%d)\n", addr, wbuf_start, wbuf_size);
+  uc->sim->app->debug("FLASH start_wbuf ");
+  uc->sim->app->debug(uc->rom->addr_format, addr);
+  uc->sim->app->debug(" (wbuf_start=");
+  uc->sim->app->debug(uc->rom->addr_format, wbuf_start);
+  uc->sim->app->debug(",size=%d)\n", wbuf_size);
 }
 
 void

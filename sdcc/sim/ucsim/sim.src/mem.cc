@@ -238,7 +238,7 @@ cl_memory::dump(t_addr start, t_addr stop, int bpl, class cl_f *f)
              (start+i*step != stop);
            i++)
         {
-          long c= read(start+i*step);
+          t_mem c= read(start+i*step);
           f->prntf("%c", isprint(255&c)?(255&c):'.');
           if (width > 8)
             f->prntf("%c", isprint(255&(c>>8))?(255&(c>>8)):'.');
@@ -356,14 +356,13 @@ cl_memory::dump_i(t_addr start, t_addr stop, int bpl, class cl_f *f)
 	      unsigned char c;	      
 	      sum= 0;
 	      c= a-start_line;
-	      f->prntf(":%02X%04X00", c, start_line);
+	      f->prntf(":%02X%04X00", c, (unsigned int)start_line);
 	      sum+= c;
 	      c= int(start_line >> 8) & 0xff;
 	      sum+= c;
 	      c= start_line & 0xff;
 	      sum+= c;
-	      int i;
-	      for (i= 0; i < a-start_line; i++)
+	      for (t_addr i= 0; i < a-start_line; i++)
 		{
 		  c= read(start_line + i);
 		  f->prntf("%02X", c);
@@ -464,10 +463,12 @@ cl_memory::print_info(chars pre, class cl_console_base *con)
   char *n= (char*)(get_name());
   if (!hidden)
     {
-      con->dd_printf("%s0x%06x-0x%06x %8d %s (%d,%s,%s)\n", (char*)pre,
-		     (unsigned int)(get_start_address()),
-		     (unsigned int)(highest_valid_address()),
-		     (unsigned int)(get_size()),
+      con->dd_printf("%s", (char*)pre);
+      con->dd_printf(addr_format, get_start_address());
+      con->dd_printf("-");
+      con->dd_printf(addr_format, highest_valid_address());
+      con->dd_printf(" %8lu %s (%d,%s,%s)\n",
+		     (unsigned long)(get_size()),
 		     n,
 		     width, data_format, addr_format);
     }
@@ -1246,8 +1247,7 @@ cl_address_space::cl_address_space(const char *id,
   else if (awidth <= 16)
     cell= &c16;
   //cell->init();
-  int i;
-  for (i= 0; i < size; i++)
+  for (t_addr i= 0; i < size; i++)
     {
       void *p1= &(cella[i]);
       void *p2= cell;
@@ -1261,8 +1261,7 @@ cl_address_space::cl_address_space(const char *id,
 cl_address_space::~cl_address_space(void)
 {
   delete decoders;
-  int i;
-  for (i= 0; i < size; i++)
+  for (t_addr i= 0; i < size; i++)
     {
       cella[i].~cl_memory_cell();
     }
@@ -1455,9 +1454,7 @@ cl_address_space::set_cell_flag(t_addr start_addr, t_addr end_addr, bool set_to,
 class cl_memory_cell *
 cl_address_space::search_cell(enum cell_flag flag, bool value, t_addr *addr)
 {
-  int i;
-
-  for (i= 0; i < size; i++)
+  for (t_addr i= 0; i < size; i++)
     {
       bool f= cella[i].get_flag(flag);
       if ((f && value) ||
@@ -1537,7 +1534,11 @@ cl_address_space::undecode_area(class cl_address_decoder *skip,
 {
 #define D if (con) con->debug
   //#define D printf
-  D("Undecoding area 0x%lx-0x%lx of %s (skip=%s)\n", begin, end, get_name(), skip?(skip->get_name()):"-");
+  D("Undecoding area ");
+  D(addr_format, begin);
+  D("-");
+  D(addr_format, end);
+  D(" of %s (skip=%s)\n", get_name(), skip?(skip->get_name()):"-");
   int i;
   for (i= 0; i < decoders->count; i++)
     {
@@ -1546,8 +1547,14 @@ cl_address_space::undecode_area(class cl_address_decoder *skip,
       if (!d ||
 	  d == skip)
 	continue;
-      D("  Checking decoder 0x%lx-0x%lx -> %s[0x%lx]\n",
-	d->as_begin, d->as_end, (d->memchip)?(d->memchip->get_name()):"(none)", d->chip_begin);
+      D("  Checking decoder ");
+      D(d->memchip->addr_format, d->as_begin);
+      D("-");
+      D(d->memchip->addr_format, d->as_end);
+      D(" -> %s[",
+	(d->memchip)?(d->memchip->get_name()):"(none)");
+      D(d->memchip->addr_format, d->chip_begin);
+      D("]\n");
       if (d->fully_covered_by(begin, end))
 	{
 	  // decoder can be removed
@@ -1564,13 +1571,23 @@ cl_address_space::undecode_area(class cl_address_decoder *skip,
 	  D("    Must be split\n");
 	  class cl_address_decoder *nd= d->split(begin, end);
 	  D("    After split:\n");
-	  D("      0x%lx-0x%lx -> %s[0x%lx]\n",
-	    d->as_begin, d->as_end, (d->memchip)?(d->memchip->get_name()):"(none)", d->chip_begin);
+          D("      ");
+          D(d->memchip->addr_format, d->as_begin);
+          D("-");
+          D(d->memchip->addr_format, d->as_end);
+          D(" -> %s[", (d->memchip ? d->memchip->get_name() : "(none)"));
+          D(d->memchip->addr_format, d->chip_begin);
+          D("]\n");
 	  if (nd)
 	    {
 	      decoders->add(nd);
-	      D("      0x%lx-0x%lx -> %s[0x%lx]\n",
-		nd->as_begin, nd->as_end, (nd->memchip)?(nd->memchip->get_name()):"none", nd->chip_begin);
+              D("      ");
+              D(nd->memchip->addr_format, nd->as_begin);
+              D("-");
+              D(nd->memchip->addr_format, nd->as_end);
+              D(" -> %s[", (nd->memchip ? nd->memchip->get_name() : "none"));
+              D(nd->memchip->addr_format, nd->chip_begin);
+              D("]\n");
 	      nd->activate(con);
 	    }
 	}
@@ -1589,8 +1606,13 @@ cl_address_space::undecode_area(class cl_address_decoder *skip,
 	    }
 	  else
 	    {
-	      D("    Shrinked to 0x%lx-0x%lx -> %s[0x%lx]\n",
-		d->as_begin, d->as_end, (d->memchip)?(d->memchip->get_name()):"(none)", d->chip_begin);
+              D("    Shrinked to ");
+              D(addr_format, d->as_begin);
+              D("-");
+              D(addr_format, d->as_end);
+              D(" -> %s[", (d->memchip ? d->memchip->get_name() : "(none)"));
+              D(addr_format, d->chip_begin);
+              D("]\n");
 	    }
 	}
     }
@@ -1690,10 +1712,12 @@ cl_address_space::print_info(chars pre, class cl_console_base *con)
   char *n= (char*)(get_name());
   if (!hidden)
     {
-      con->dd_printf("%s0x%06x-0x%06x %8d %s (%d,%s,%s)\n", (char*)pre,
-		     (unsigned int)(get_start_address()),
-		     (unsigned int)(highest_valid_address()),
-		     (unsigned int)(get_size()),
+      con->dd_printf("%s", (char*)pre);
+      con->dd_printf(addr_format, get_start_address());
+      con->dd_printf("-");
+      con->dd_printf(addr_format, highest_valid_address());
+      con->dd_printf(" %8lu %s (%d,%s,%s)\n",
+		     (unsigned long)(get_size()),
 		     n,
 		     width, data_format, addr_format);
     }
@@ -1761,10 +1785,9 @@ int
 cl_memory_chip::init(void)
 {
   cl_memory::init();
-  int i;
   if (array_is_mine)
     {
-      for (i= 0; i < size; i++)
+      for (t_addr i= 0; i < size; i++)
 	set(i,
 	    (init_value<0)?rand():(init_value)
 	    );
@@ -1835,10 +1858,12 @@ cl_memory_chip::print_info(chars pre, class cl_console_base *con)
   if (!hidden)
     {
       //con->dd_printf(pre0);
-      con->dd_printf("%s0x%06x-0x%06x %8d %s (%d,%s,%s)\n", (char*)pre,
-		     (unsigned int)(get_start_address()),
-		     (unsigned int)(highest_valid_address()),
-		     (unsigned int)(get_size()),
+      con->dd_printf("%s", (char*)pre);
+      con->dd_printf(addr_format, get_start_address());
+      con->dd_printf("-");
+      con->dd_printf(addr_format, highest_valid_address());
+      con->dd_printf(" %8lu %s (%d,%s,%s)\n",
+		     (unsigned long)(get_size()),
 		     n,
 		     width, data_format, addr_format);
     }
@@ -1887,7 +1912,11 @@ cl_address_decoder::activate(class cl_console_base *con)
 {
 #define D if (con) con->debug
   //#define D printf
-  D("Activation of an address decoder %s (%s[%06lx-%06lx]\n", get_name(""), address_space->get_name(), as_begin, as_end);
+  D("Activation of an address decoder %s (%s[", get_name(), address_space->get_name());
+  D(address_space->addr_format, as_begin);
+  D("-");
+  D(address_space->addr_format, as_end);
+  D("]\n");
   if (activated)
     {
       D("Already activated\n");
@@ -1929,16 +1958,26 @@ cl_address_decoder::activate(class cl_console_base *con)
 
   address_space->undecode_area(this, as_begin, as_end, con);
 
-  D("Decoder maps %s[%06lx-%06lx] -> %s[%06lx]...\n",address_space->get_name(),as_begin,as_end,memchip->get_name(),chip_begin);
+  D("Decoder maps %s[",address_space->get_name());
+  D(address_space->addr_format, as_begin);
+  D("-");
+  D(address_space->addr_format, as_end);
+  D("] -> %s[", memchip->get_name());
+  D(address_space->addr_format, chip_begin);
+  D("]\n");
   t_addr asa, ca;
   for (asa= as_begin, ca= chip_begin;
        asa <= as_end;
        asa++, ca++)
     {
       if (!address_space->decode_cell(asa, memchip, ca))
-	{
-	  D("Decoding 0x%06lx->0x%06lx failed\n", asa, ca);
-	}
+        {
+          D("Decoding ");
+          D(address_space->addr_format, asa);
+          D("->");
+          D(address_space->addr_format, ca);
+          D(" failed\n");
+        }
     }
   activated= true;
 

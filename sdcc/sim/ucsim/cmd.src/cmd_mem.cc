@@ -456,11 +456,12 @@ COMMAND_DO_WORK_UC(cl_memory_cell_cmd)
       cl_memory_chip *ch= (cl_memory_chip*)(uc->memchips->at(i));
       t_addr ad;
       if ((ad= ch->is_slot(c->get_data())) >= 0)
-	{
-	  con->dd_printf("  decoded to %s[%d]\n",
-			 ch->get_name(), ad);
-	  break;
-	}
+        {
+          con->dd_printf("  decoded to %s[", ch->get_name());
+          con->dd_printf(ch->addr_format, ad);
+          con->dd_printf("]\n");
+          break;
+        }
     }
 
   con->dd_printf("Operators:\n");

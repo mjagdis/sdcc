@@ -92,7 +92,7 @@ cl_wdt::reset(void)
 void
 cl_wdt::print_info(class cl_console_base *con)
 {
-  con->dd_printf("%s[%d] %s counter=%d (remains=%d)\n", id_string, id,
+  con->dd_printf("%s[%d] %s counter=%ld (remains=%ld)\n", id_string, id,
 		 (wdt>=0)?"ON":"OFF", wdt, (wdt>=0)?(reset_value-wdt):0);
 }
 

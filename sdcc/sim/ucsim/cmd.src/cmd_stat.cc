@@ -105,9 +105,11 @@ COMMAND_DO_WORK_UC(cl_statistic_cmd)
 	    unsigned long w= c->nuof_writes, r= c->nuof_reads;
 	    double dr= wr?((double(r)*100.0)/double(wr)):0.0;
 	    double dw= ww?((double(w)*100.0)/double(ww)):0.0;
-	    con->dd_printf("%s[0x%06x] writes= %10lu (%6.2lf%%) "
-			   "reads= %10lu (%6.2lf%%)\n",
-			   mem->get_name("mem"), i, w, dw, r, dr);
+            con->dd_printf("%s[", mem->get_name("mem"));
+            con->dd_printf(mem->addr_format, i);
+            con->dd_printf("] writes= %10lu (%6.2lf%%) "
+                           "reads= %10lu (%6.2lf%%)\n",
+                           w, dw, r, dr);
 	  }
     }
 

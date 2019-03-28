@@ -136,7 +136,8 @@ cl_itc::print_info(class cl_console_base *con)
   for (i= 0; i < uc->it_sources->count; i++)
     {
       class cl_it_src *is= (class cl_it_src *)(uc->it_sources->at(i));
-      con->dd_printf("  0x%06x", is->addr);
+      con->dd_printf("  ");
+      con->dd_printf(uc->rom->addr_format, is->addr);
       con->dd_printf(" %-3s", (is->enabled())?"en":"dis");
       con->dd_printf(" %2d", uc->priority_of(/*is->ie_mask*/is->nuof));
       con->dd_printf(" %-3s", (is->pending())?"YES":"no");
@@ -150,14 +151,15 @@ cl_itc::print_info(class cl_console_base *con)
     {
       class it_level *il= (class it_level *)(uc->it_levels->at(i));
       if (il->level >= 0)
-	{
-	  con->dd_printf("  %2d", il->level);
-	  con->dd_printf(" 0x%06x", il->addr);
-	  con->dd_printf(" 0x%06x", il->PC);
-	  con->dd_printf(" %s", (il->source)?(object_name(il->source)):
-			 "nothing");
-	  con->dd_printf("\n");
-	}
+        {
+          con->dd_printf("  %2d ", il->level);
+          con->dd_printf(uc->rom->addr_format, il->addr);
+          con->dd_printf(" ");
+          con->dd_printf(uc->rom->addr_format, il->PC);
+          con->dd_printf(" %s", (il->source)?(object_name(il->source)):
+                         "nothing");
+          con->dd_printf("\n");
+        }
     }
 }
 

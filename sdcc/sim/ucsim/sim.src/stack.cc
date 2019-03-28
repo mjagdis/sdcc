@@ -27,6 +27,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include <stdlib.h>
 
+#include "appcl.h"
+
 // cmd.src
 #include "newcmdcl.h"
 
@@ -73,9 +75,11 @@ cl_stack_op::info_head(class cl_console_base *con)
 void
 cl_stack_op::info(class cl_console_base *con, class cl_uc *uc)
 {
-  con->dd_printf("%-4s 0x%06x-0x%06x %d ",
-		 get_op_name(),
-		 (int)SP_before, (int)SP_after, labs(SP_before-SP_after));
+  con->dd_printf("%-4s ", get_op_name());
+  con->dd_printf(uc->rom->addr_format, SP_before);
+  con->dd_printf("-");
+  con->dd_printf(uc->rom->addr_format, SP_after);
+  con->dd_printf(" %ld ", labs(SP_before-SP_after));
   print_info(con);
   con->dd_printf(" ");
   uc->print_disass(PC, con);
@@ -103,12 +107,10 @@ cl_stack_op::sp_increased(void)
     return(SP_after < SP_before);
 }
 
-int
+t_addr
 cl_stack_op::data_size(void)
 {
-  int r= SP_after - SP_before;
-
-  return(r<0?-r:r);
+  return (SP_after > SP_before ? SP_after - SP_before : SP_before - SP_after);
 }
 
 bool
@@ -174,7 +176,7 @@ cl_stack_call::get_op_name(void)
 void
 cl_stack_call::print_info(class cl_console_base *con)
 {
-  con->dd_printf("0x%06x", (int)called_addr);
+  con->dd_printf("0x%06lx", (unsigned long)called_addr);
 }
 
 const char *
@@ -225,7 +227,7 @@ cl_stack_intr::get_op_name(void)
 void
 cl_stack_intr::print_info(class cl_console_base *con)
 {
-  con->dd_printf("0x%06x", (int)called_addr);
+  con->dd_printf("0x%06lx", (unsigned long)called_addr);
 }
 
 const char *
@@ -287,7 +289,7 @@ void
 cl_stack_push::print_info(class cl_console_base *con)
 {
   t_addr d= data;
-  con->dd_printf("0x%06x", (int)d);
+  con->dd_printf("0x%06lx", (unsigned long)d);
 }
 
 bool
@@ -476,13 +478,16 @@ cl_error_stack_tracker_empty::~cl_error_stack_tracker_empty(void)
 void
 cl_error_stack_tracker_empty::print(class cl_commander_base *c)
 {
-  c->dd_printf("%s(0x%06x): %s on empty stack, PC="
-	       "0x06x, SP=0x%06x->0x%06x\n",
-	       get_type_name(), (int)operation->get_pc(),
-	       operation->get_op_name(),
-	       (int)operation->get_pc(),
-	       (int)operation->get_before(),
-	       (int)operation->get_after());
+  const char *addr_format= c->app->sim->uc->rom->addr_format;
+  c->dd_printf("%s(", get_type_name());
+  c->dd_printf(addr_format, operation->get_pc());
+  c->dd_printf("): %s on empty stack, PC=", operation->get_op_name());
+  c->dd_printf(addr_format, operation->get_pc());
+  c->dd_printf(", SP=");
+  c->dd_printf(addr_format, operation->get_before());
+  c->dd_printf("->");
+  c->dd_printf(addr_format, operation->get_after());
+  c->dd_printf("\n");
 }
 
 /* Stack Tracker: operation on empty stack */
@@ -517,12 +522,15 @@ cl_error_stack_tracker_unmatch::~cl_error_stack_tracker_unmatch(void)
 void
 cl_error_stack_tracker_unmatch::print(class cl_commander_base *c)
 {
-  c->dd_printf("%s(0x%06x): %s when %s expected, "
-	       "SP=0x%06x->0x%06x\n",
-	       get_type_name(), (int)operation->get_pc(),
-	       operation->get_op_name(), top->get_matching_name(),
-	       (int)operation->get_before(),
-	       (int)operation->get_after());
+  const char *addr_format= c->app->sim->uc->rom->addr_format;
+  c->dd_printf("%s(", get_type_name());
+  c->dd_printf(addr_format, operation->get_pc());
+  c->dd_printf("): %s when %s expected, SP=",
+	       operation->get_op_name(), top->get_matching_name());
+  c->dd_printf(addr_format, operation->get_before());
+  c->dd_printf("->");
+  c->dd_printf(addr_format, operation->get_after());
+  c->dd_printf("\n");
 }
 
 /* Stack Tracker: stack is inconsistent */
@@ -544,9 +552,10 @@ cl_error_stack_tracker_inconsistent::~cl_error_stack_tracker_inconsistent(void)
 void
 cl_error_stack_tracker_inconsistent::print(class cl_commander_base *c)
 {
-  c->dd_printf("%s(0x%06x): %d byte(s) unread from the stack\n",
-	       get_type_name(), (int)operation->get_pc(),
-	       unread_data_size);
+  const char *addr_format= c->app->sim->uc->rom->addr_format;
+  c->dd_printf("%s(", get_type_name());
+  c->dd_printf(addr_format, operation->get_pc());
+  c->dd_printf("): %d byte(s) unread from the stack\n", unread_data_size);
 }
 
 cl_stack_error_registry::cl_stack_error_registry(void)

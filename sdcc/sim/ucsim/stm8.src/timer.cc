@@ -422,8 +422,9 @@ cl_tim::print_info(class cl_console_base *con)
 {
   u8_t c1= regs[idx.cr1]->get();
   // features
-  con->dd_printf("%s %d bit %s counter at 0x%06x\n", get_name(), bits,
-		 bidir?"Up/Down":"Up", base);
+  con->dd_printf("%s %d bit %s counter at ", get_name(), bits, bidir?"Up/Down":"Up");
+  con->dd_printf(uc->rom->addr_format, base);
+  con->dd_printf("\n");
   // actual values
   con->dd_printf("clk= %s\n", clk_enabled?"enabled":"disabled");
   con->dd_printf("cnt= 0x%04x %d %s\n", cnt, cnt, (c1&cen)?"on":"off");

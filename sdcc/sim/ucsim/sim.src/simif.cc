@@ -634,16 +634,18 @@ cl_simulator_interface::set_cmd(class cl_cmdline *cmdline,
       t_addr a= params[1]->value.address;
       if (!mem->is_address_space())
 	{
-	  con->dd_printf("%s is not an address space\n");
+	  con->dd_printf("%s is not an address space\n", params[0]->get_svalue());
 	  return;
 	}
       if (!mem->valid_address(a))
-	{
-	  con->dd_printf("Address must be between 0x%x and 0x%x\n",
-			 mem->lowest_valid_address(),
-			 mem->highest_valid_address());
-	  return;
-	}
+        {
+          con->dd_printf("Address must be between ");
+          con->dd_printf(mem->addr_format, mem->lowest_valid_address());
+          con->dd_printf(" and ");
+          con->dd_printf(mem->addr_format, mem->highest_valid_address());
+          con->dd_printf("\n");
+          return;
+        }
       as_name= strdup((char*)mem->get_name());
       addr= a;
       if ((as= dynamic_cast<class cl_address_space *>(mem)) != 0)
@@ -884,7 +886,7 @@ cl_simulator_interface::print_info(class cl_console_base *con)
   if (as)
     con->dd_printf(as->addr_format, address);
   else
-    con->dd_printf("0x%x", address);
+    con->dd_printf("0x%06lx", (unsigned long)address);
   con->dd_printf("]\n");
   
   con->dd_printf("Active command: ");

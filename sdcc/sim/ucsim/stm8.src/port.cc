@@ -100,7 +100,9 @@ cl_port::print_info(class cl_console_base *con)
   t_mem o= cell_p->get(),
     i= cell_in->get(),
     d= cell_dir->get();
-  con->dd_printf("%s at 0x%04x\n", get_name(), base);
+  con->dd_printf("%s at ", get_name());
+  con->dd_printf(uc->rom->addr_format, base);
+  con->dd_printf("\n");
   con->dd_printf("dir: 0x%02x ", d);
   for (m= 0x80; m; m>>= 1)
     con->dd_printf("%c", (d & m)?'O':'I');

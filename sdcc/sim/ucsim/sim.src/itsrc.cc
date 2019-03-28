@@ -214,7 +214,7 @@ cl_irqs::compare(void *key1, void *key2)
  ******************************************************************************
  */
 
-it_level::it_level(int alevel, uint aaddr, uint aPC, class cl_it_src *is):
+it_level::it_level(int alevel, t_addr aaddr, t_addr aPC, class cl_it_src *is):
   cl_base()
 {
   level = alevel;

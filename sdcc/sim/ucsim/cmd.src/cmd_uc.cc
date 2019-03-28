@@ -48,10 +48,9 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 //		      class cl_cmdline *cmdline, class cl_console *con)
 COMMAND_DO_WORK_UC(cl_state_cmd)
 {
-  con->dd_printf("CPU state= %s PC= 0x%06x XTAL= %g\n",
-		 get_id_string(cpu_states, uc->state),
-		 uc->PC, 
-		 uc->xtal);
+  con->dd_printf("CPU state= %s PC= ", get_id_string(cpu_states, uc->state));
+  con->dd_printf(uc->rom->addr_format, uc->PC);
+  con->dd_printf(" XTAL= %g\n", uc->xtal);
   con->dd_printf("Operation since last reset= (%lu vclks)\n",
 		 (unsigned long)(uc->vc.fetch) +
 		 (unsigned long)(uc->vc.rd) +
@@ -74,8 +73,11 @@ COMMAND_DO_WORK_UC(cl_state_cmd)
 		 (uc->ticks->ticks == 0)?0.0:
 		 (100.0*((double)(uc->idle_ticks->ticks)/
 			 (double)(uc->ticks->ticks))));
-  con->dd_printf("Max value of stack pointer= 0x%06x, avg= 0x%06x\n",
-		 uc->sp_max, uc->sp_avg);
+  con->dd_printf("Max value of stack pointer= ");
+  con->dd_printf(uc->rom->addr_format, uc->sp_max);
+  con->dd_printf(", avg= ");
+  con->dd_printf(uc->rom->addr_format, uc->sp_avg);
+  con->dd_printf("\n");
   con->dd_printf("Simulation: %s\n",
 		 (uc->sim->state & SIM_GO)?"running":"stopped");
   return(0);
@@ -155,7 +157,11 @@ COMMAND_DO_WORK_UC(cl_pc_cmd)
 	    addr= rom->highest_valid_address();
 	}
       if (!uc->inst_at(addr))
-	con->dd_printf("Warning: maybe not instruction at 0x%06x\n", addr);
+        {
+          con->dd_printf("Warning: maybe not instruction at ");
+          con->dd_printf(uc->rom->addr_format, addr);
+          con->dd_printf("\n");
+        }
       uc->PC= addr;
     }
   uc->print_disass(uc->PC, con);

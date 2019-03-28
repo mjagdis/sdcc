@@ -61,26 +61,29 @@ COMMAND_DO_WORK_SIM(cl_run_cmd)
   if (params[0])
     if (!(params[0]->get_address(sim->uc, &start)))
       {
-	con->dd_printf(cchars("Error: wrong start address\n"));
+	con->dd_printf("Error: wrong start address\n");
 	return(false);
       }
   if (params[1])
     if (!(params[1]->get_address(sim->uc, &end)))
       {
-	con->dd_printf(cchars("Error: wromg end address\n"));
+	con->dd_printf("Error: wromg end address\n");
 	return(false);
       }
   if (params[0])
     {
       if (!sim->uc->inst_at(start))
-	con->dd_printf(cchars("Warning: maybe not instruction at 0x%06lx\n"),
-		       start);
+        {
+          con->dd_printf("Warning: maybe not instruction at ");
+          con->dd_printf(sim->uc->rom->addr_format, start);
+          con->dd_printf("\n");
+        }
       sim->uc->PC= start;
       if (params[1])
 	{
 	  if (start == end)
 	    {
-	      con->dd_printf(cchars("Addresses must be different.\n"));
+	      con->dd_printf("Addresses must be different.\n");
 	      return(false);
 	    }
 	  if ((b= sim->uc->fbrk_at(end)))
@@ -95,7 +98,9 @@ COMMAND_DO_WORK_SIM(cl_run_cmd)
 	    }
 	}
     }
-  con->dd_printf(cchars("Simulation started, PC=0x%06x\n"), sim->uc->PC);
+  con->dd_printf("Simulation started, PC=");
+  con->dd_printf(sim->uc->rom->addr_format, sim->uc->PC);
+  con->dd_printf("\n");
   /*
   if (sim->uc->fbrk_at(sim->uc->PC))
     sim->uc->do_inst(1);
@@ -483,18 +488,18 @@ COMMAND_DO_WORK_APP(cl_expression_cmd)
 	    {
 	      switch (fmt[i])
 		{
-		case 'x': con->dd_printf("%lx\n", v); break;
-		case 'X': con->dd_printf("0x%lx\n", v); break;
-		case '0': con->dd_printf("0x%08lx\n", v); break;
-		case 'd': con->dd_printf("%ld\n", v); break;
-		case 'o': con->dd_printf("%lo\n", v); break;
-		case 'u': con->dd_printf("%lu\n", v); break;
+		case 'x': con->dd_printf("%x\n", v); break;
+		case 'X': con->dd_printf("0x%x\n", v); break;
+		case '0': con->dd_printf("0x%08x\n", v); break;
+		case 'd': con->dd_printf("%d\n", (int)v); break;
+		case 'o': con->dd_printf("%o\n", v); break;
+		case 'u': con->dd_printf("%u\n", v); break;
 		case 'b': con->dd_printf("%s\n", (char*)cbin(v,8*sizeof(v))); break;
 		}
 	    }
 	}
       else
-	con->dd_printf("%ld\n", v);
+	con->dd_printf("%d\n", (int)v);
     }
   return(false);
 }

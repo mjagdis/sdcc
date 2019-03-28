@@ -275,12 +275,12 @@ cl_avr::disass(t_addr addr, const char *sep)
 		int k= (code&0x3f8)>>3;
 		if (code&0x200)
 		  k|= -128;
-		sprintf(temp, "0x%06x", k+1+(signed int)addr);
+		sprintf(temp, rom->addr_format, k+1+(signed int)addr);
 		break;
 	      }
 	    case 'A': // k    .... ...k kkkk ...k  0<=k<=64K
 	              //      kkkk kkkk kkkk kkkk  0<=k<=4M
-	      sprintf(temp, "0x%06x",
+	      sprintf(temp, rom->addr_format,
 		      (((code&0x1f0)>>3)|(code&1))*0x10000+
 		      (uint)rom->get/*_mem*/(/*MEM_ROM_ID,*/ addr+1));
 	      break;
@@ -299,15 +299,15 @@ cl_avr::disass(t_addr addr, const char *sep)
 		      ((code&0x2000)>>8)|((code&0xc00)>>7)|(code&7));
 	      break;
 	    case 'R': // k    SRAM address on second word 0<=k<=65535
-	      sprintf(temp, "0x%06x", (uint)rom->get/*_mem*/(/*MEM_ROM_ID,*/ addr+1));
+	      sprintf(temp, rom->addr_format, rom->get/*_mem*/(/*MEM_ROM_ID,*/ addr+1));
 	      break;
 	    case 'a': // k    .... kkkk kkkk kkkk  -2k<=k<=2k
 	      {
 		int k= code&0xfff;
 		if (code&0x800)
 		  k|= -4096;
-		sprintf(temp, "0x%06x",
-			(int)rom->validate_address(k+1+(signed int)addr));
+		sprintf(temp, rom->addr_format,
+			rom->validate_address(k+1+(signed int)addr));
 		break;
 	      }
 	    default:
@@ -368,7 +368,9 @@ cl_avr::print_regs(class cl_console_base *con)
 		 (sreg&BIT_N)?'1':'0',
 		 (sreg&BIT_Z)?'1':'0',
 		 (sreg&BIT_C)?'1':'0');
-  con->dd_printf("SP  = 0x%06x\n", ram->get(SPH)*256+ram->get(SPL));
+  con->dd_printf("SP  = ");
+  con->dd_printf(ram->addr_format, ram->get(SPH)*256+ram->get(SPL));
+  con->dd_printf("\n");
 
   x= ram->get(XH)*256 + ram->get(XL);
   data= ram->get(x);
