@@ -346,5 +346,91 @@ is_cdb_file(class cl_f *f)
   return false;
 }
 
+double
+scale_prefix(double d, const char **prefix, double factor)
+{
+  static const char *prefix1[] = { "", "m", "µ", "n", "p", "f" };
+  static const char *prefix2[] = { "", "k", "M", "G", "T", "P" };
+
+  size_t i;
+
+  if (d < 1.0)
+    {
+      for (i = 0; i < sizeof(prefix1)/sizeof(prefix1[0]) - 1 && fmod(d, 1.0) >= 0.000000000000001; i++, d *= factor);
+      *prefix = prefix1[i];
+    }
+  else
+    {
+      for (i = 0; i < sizeof(prefix2)/sizeof(prefix2[0]) - 1; i++)
+        {
+          double d2 = d / factor;
+          if (fmod(d2, 1.0) >= 0.000000000000001)
+            break;
+          d = d2;
+	}
+      *prefix = prefix2[i];
+    }
+
+  return d;
+}
+
+double
+strtod_unscaled(const char *s)
+{
+  char *scale = NULL;
+  double d = strtod(s, &scale);
+
+  if (scale[0])
+    {
+      switch (scale[0])
+        {
+          case 'f':
+            d /= 1000000000000000.0;
+            break;
+          case 'p':
+            d /= 1000000000000.0;
+            break;
+          case 'n':
+            d /= 1000000000.0;
+            break;
+          case 'u':
+            d /= 1000000.0;
+            break;
+          case 'm':
+            d /= 1000.0;
+            break;
+          default:
+            if (!strncmp(scale, "µ", sizeof("µ") - 1))
+              d /= 1000000.0;
+            else
+              {
+                double factor = (scale[1] == 'i' ? 1024.0 : 1000.0);
+
+                switch (scale[0])
+                  {
+                    case 'k':
+                      d *= factor;
+                      break;
+                    case 'M':
+                      d *= factor * factor;
+                      break;
+                    case 'G':
+                      d *= factor * factor * factor;
+                      break;
+                    case 'T':
+                      d *= factor * factor * factor * factor;
+                      break;
+                    case 'P':
+                      d *= factor * factor * factor * factor * factor;
+                      break;
+                  }
+              }
+            break;
+        }
+    }
+
+  return d;
+}
+
 
 /* End of utils.cc */

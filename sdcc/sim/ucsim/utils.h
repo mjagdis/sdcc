@@ -28,6 +28,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #ifndef UTILS_HEADER
 #define UTILS_HEADER
 
+#include <math.h>
 #include <stdio.h>
 #include <stdarg.h>
 
@@ -65,6 +66,15 @@ extern bool is_hex_file(class cl_f *f);
 extern bool is_omf_file(class cl_f *f);
 extern bool is_cdb_file(class cl_f *f);
 
+extern double scale_prefix(double d, const char **prefix, double factor);
+static inline double si_prefix(double d, const char **prefix) {
+  return scale_prefix(d, prefix, 1000.0);
+}
+static inline double ieee_prefix(double d, const char **prefix) {
+  return scale_prefix(d, prefix, 1024.0);
+}
+
+extern double strtod_unscaled(const char *s);
 
 #endif
 
