@@ -50,7 +50,8 @@ COMMAND_ANCESTOR_ON(uc,cl_timer_delete_cmd,cl_timer_cmd);
 COMMAND_ANCESTOR_ON(uc,cl_timer_get_cmd,cl_timer_cmd);
 COMMAND_ANCESTOR_ON(uc,cl_timer_run_cmd,cl_timer_cmd);
 COMMAND_ANCESTOR_ON(uc,cl_timer_stop_cmd,cl_timer_cmd);
-COMMAND_ANCESTOR_ON(uc,cl_timer_value_cmd,cl_timer_cmd);
+COMMAND_ANCESTOR_ON(uc,cl_timer_ticks_cmd,cl_timer_cmd);
+COMMAND_ANCESTOR_ON(uc,cl_timer_time_cmd,cl_timer_cmd);
 
 
 #endif

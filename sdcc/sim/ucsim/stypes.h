@@ -262,6 +262,7 @@ enum sim_state {
 
 /* States of CPU */
 enum cpu_state {
+  stUNDEF	= -1,	/* Not defined or unknown */
   stGO		= 0,	/* Normal state */
   stIDLE	= 1,	/* Idle mode is active */
   stPD		= 2	/* Power Down mode is active */

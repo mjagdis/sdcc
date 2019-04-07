@@ -65,43 +65,74 @@ static class cl_uc_error_registry uc_error_registry;
  * Clock counter
  */
 
-cl_ticker::cl_ticker(int adir, int in_isr, const char *aname)
+cl_ticker::cl_ticker(const char *aname, bool artime, double afreq, int adir, enum cpu_state astate, bool ainisr)
 {
-  options= TICK_RUN;
-  if (in_isr)
-    options|= TICK_INISR;
-  dir= adir;
-  ticks= 0;
   set_name(aname);
+  rtime = artime;
+  freq= afreq;
+  dir= adir;
+  state= astate;
+  inisr= ainisr;
+  ticks= 0;
+  run= true;
 }
 
 cl_ticker::~cl_ticker(void) {}
 
-int
+void
 cl_ticker::tick(int nr)
 {
-  if (options&TICK_RUN)
-    ticks+= dir*nr;
-  return(ticks);
+  ticks+= dir * nr;
 }
 
 double
-cl_ticker::get_rtime(double xtal)
+cl_ticker::get_rtime(void)
 {
-  double d;
-
-  d= (double)ticks/xtal;
-  return(d);
+  return (double)ticks / freq;
 }
 
 void
-cl_ticker::dump(int nr, double xtal, class cl_console_base *con)
+cl_ticker::dump(class cl_uc *uc, int nr, class cl_console_base *con)
 {
-  con->dd_printf("timer #%d(\"%s\") %s%s: %g sec (%lu clks)\n",
-		 nr, get_name("unnamed"),
-		 (options&TICK_RUN)?"ON":"OFF",
-		 (options&TICK_INISR)?",ISR":"",
-		 get_rtime(xtal), ticks);
+  con->dd_printf("timer #%3d %-8s %s:",
+                 nr, get_name(""),
+                 (run ? " ON": "OFF"));
+
+  if (dir > 1 || dir < -1)
+    con->dd_printf(" %3d", dir);
+  else
+    con->dd_printf((dir > 0 ? " inc" : " dec"));
+
+  if (dir < 0)
+    con->dd_printf("      ");
+  else
+    con->dd_printf(" %3.0f%% ",
+                   (uc->ticks->get_rtime() ? 100.0 * get_rtime() / uc->ticks->get_rtime() : 0.0));
+
+  con->dd_printf("%18.15f sec", get_rtime());
+
+  if (nr != 0)
+    {
+      if (state == stGO)
+        {
+          const char *sname = get_id_string(cpu_states, state, (char *)"unknown");
+          con->dd_printf(" %s (%s ISR)%*s",
+                         sname,
+                         (inisr ? "in" : "not"),
+                         16 - 7 - strlen(sname) - (inisr ? 2 : 3), "");
+        }
+      else
+        con->dd_printf(" %-16s", get_id_string(cpu_states, state, (char *)"unknown"));
+    }
+
+  if (!rtime)
+    {
+      const char *scale;
+      double sfreq= si_prefix(freq, &scale);
+      con->dd_printf(" %ld clks @ %.0f%sHz", ticks, sfreq, scale);
+    }
+
+  con->dd_printf("\n");
 }
 
 
@@ -131,37 +162,44 @@ cl_xtal_option::option_changed(void)
 cl_time_measurer::cl_time_measurer(class cl_uc *the_uc):
   cl_base()
 {
-  to_reach= 0;
   uc= the_uc;
 }
 
+/* value of elapsed time */
+
 void
-cl_time_measurer::set_reach(unsigned long val)
+cl_time_rtime::from_now(double val)
+{
+  to_reach= uc->get_rtime() + val;
+}
+
+bool
+cl_time_rtime::reached()
+{
+  return to_reach &&
+    (uc->get_rtime() >= to_reach);
+}
+
+/* value of xtal clock */
+
+void
+cl_time_clk::set_reach(unsigned long val)
 {
   to_reach= val;
 }
 
 void
-cl_time_measurer::from_now(unsigned long val)
+cl_time_clk::from_now(unsigned long val)
 {
   set_reach(now() + val);
 }
 
 bool
-cl_time_measurer::reached()
+cl_time_clk::reached()
 {
   return to_reach &&
     (now() >= to_reach);
 }
-
-unsigned long
-cl_time_measurer::now()
-{
-  return 0;
-}
-
-
-/* value of xtal clock */
 
 unsigned long
 cl_time_clk::now()
@@ -325,6 +363,8 @@ cl_uc::cl_uc(class cl_sim *asim):
   type= NULL;
   //int i;
   sim = asim;
+  xtal= 11059200;
+
   //mems= new cl_list(MEM_TYPES, 1);
   memchips= new cl_memory_list(this, "memchips");
   address_spaces= new cl_memory_list(this, "address_spaces");
@@ -336,10 +376,9 @@ cl_uc::cl_uc(class cl_sim *asim):
   //for (i= MEM_ROM; i < MEM_TYPES; i++) mems->add(0);
   xtal_option= new cl_xtal_option(this);
   xtal_option->init();
-  ticks= new cl_ticker(+1, 0, "time");
-  isr_ticks= new cl_ticker(+1, TICK_INISR, "isr");
-  idle_ticks= new cl_ticker(+1, TICK_IDLE, "idle");
-  counters= new cl_list(2, 2, "counters");
+
+  counters= new cl_list(4, 2, "counters");
+
   it_levels= new cl_list(2, 2, "it levels");
   it_sources= new cl_irqs(2, 2);
   class it_level *il= new it_level(-1, 0, 0, 0);
@@ -358,9 +397,7 @@ cl_uc::~cl_uc(void)
   //delete mems;
   delete hws;
   //delete options;
-  delete ticks;
-  delete isr_ticks;
-  delete idle_ticks;
+  counters->free_all();
   delete counters;
   events->disconn_all();
   delete events;
@@ -385,10 +422,6 @@ cl_uc::init(void)
 
   set_name("controller");
   cl_base::init();
-  if (xtal_option->use("xtal"))
-    xtal= xtal_option->get_value(xtal);
-  else
-    xtal= 11059200;
   vars= new cl_var_list();
   make_variables();
   make_memories();
@@ -404,6 +437,28 @@ cl_uc::init(void)
   class cl_cmdset *cs= sim->app->get_commander()->cmdset;
   build_cmdset(cs);
   irq= false;
+
+  double userxtal = xtal;
+  if (xtal_option->use("xtal"))
+    userxtal= xtal_option->get_value(xtal);
+
+  // Realtime is based on the higher of the default XTAL frequency and the
+  // user-requested XTAL frequency. This assumes MCUs power up at their
+  // maximum frequency and may be able to be stepped down rather than
+  // powering up at a lower frequency and able to be stepped up.
+  ticks= new cl_ticker("time", true, (userxtal > xtal ? userxtal : xtal), +1, stUNDEF);
+
+  main_ticks= new cl_ticker("main", true, ticks->freq, +1, stGO, false);
+  add_counter(main_ticks, main_ticks->get_name());
+
+  isr_ticks= new cl_ticker("inisr", true, ticks->freq, +1, stGO, true);
+  add_counter(isr_ticks, isr_ticks->get_name());
+
+  idle_ticks= new cl_ticker("idle", true, ticks->freq, +1, stIDLE);
+  add_counter(idle_ticks, idle_ticks->get_name());
+
+  xtal= userxtal;
+
   reset();
 
   return 0;
@@ -438,7 +493,7 @@ cl_uc::reset(void)
   isr_ticks->ticks= 0;
   idle_ticks->ticks= 0;
   vc.inst= vc.fetch= vc.rd= vc.wr= 0;
-  /*FIXME should we clear user counters?*/
+  /* FIXME should we clear user counters?*/
   il= (class it_level *)(it_levels->top());
   while (il &&
 	 il->level >= 0)
@@ -697,9 +752,12 @@ cl_uc::build_cmdset(class cl_cmdset *cmdset)
     cmd->add_name("start");
     cset->add(cmd= new cl_timer_stop_cmd("stop", 0));
     cmd->init();
-    cset->add(cmd= new cl_timer_value_cmd("set", 0));
+    cset->add(cmd= new cl_timer_ticks_cmd("ticks", 0));
     cmd->init();
+    cmd->add_name("set");
     cmd->add_name("value");
+    cset->add(cmd= new cl_timer_time_cmd("time", 0));
+    cmd->init();
   }
   if (!super_cmd) {
     cmdset->add(cmd= new cl_super_cmd("timer", 0, cset));
@@ -1899,7 +1957,7 @@ int
 cl_uc::tick_hw(int cycles)
 {
   class cl_hw *hw;
-  int i;//, cpc= clock_per_cycle();
+  int i;
 
   // tick hws
   for (i= 0; i < hws->count; i++)
@@ -1920,29 +1978,53 @@ cl_uc::do_extra_hw(int cycles)
 int
 cl_uc::tick(int cycles)
 {
-  //class cl_hw *hw;
-  int i, cpc= clock_per_cycle();
+  // tick for hardwares
+  if (state != stPD)
+    inst_ticks+= cycles;
 
-  // increase time
-  ticks->tick(cycles * cpc);
+  ticks->tick(cycles * clock_per_cycle() * ticks->freq / xtal);
+  update_tickers(true, ticks->freq, cycles * clock_per_cycle() * ticks->freq / xtal);
+
+  if (state == stGO)
+    update_tickers(false, xtal / clock_per_cycle(), cycles);
+  else
+    update_tickers(false, xtal, cycles * clock_per_cycle());
+
+  return 0;
+}
+
+int
+cl_uc::update_tickers(bool rtime, double freq, int cycles)
+{
+
   class it_level *il= (class it_level *)(it_levels->top());
-  if (il->level >= 0)
-    isr_ticks->tick(cycles * cpc);
-  if (state == stIDLE)
-    idle_ticks->tick(cycles * cpc);
-  for (i= 0; i < counters->count; i++)
+  int tickers_updated = 0;
+
+  for (int i= 0; i < counters->count; i++)
     {
       class cl_ticker *t= (class cl_ticker *)(counters->at(i));
-      if (t)
-	{
-	  if ((t->options&TICK_INISR) ||
-	      il->level < 0)
-	    t->tick(cycles * cpc);
-	}
+      if (t && t->run &&
+           t->rtime == rtime &&
+           t->freq == freq &&
+           (t->state == stUNDEF ||
+            (t->state == state &&
+             (t->state != stGO ||
+              ((!t->inisr && il->level < 0) ||
+               (t->inisr && il->level >= 0))))))
+        {
+          t->tick(cycles);
+          if (t->state != stUNDEF)
+            tickers_updated++;
+        }
     }
 
-  // tick for hardwares
-  inst_ticks+= cycles;
+  if (tickers_updated == 0)
+    {
+      class cl_ticker *ticker = new cl_ticker(NULL, rtime, freq, +1, state, (il->level >= 0));
+      add_counter(ticker, ticker->get_name());
+      ticker->tick(cycles);
+    }
+
   return(0);
 }
 
@@ -2237,23 +2319,7 @@ cl_uc::accept_it(class it_level *il)
 double
 cl_uc::get_rtime(void)
 {
-  /*  double d;
-
-  d= (double)ticks/xtal;
-  return(d);*/
-  return(ticks->get_rtime(xtal));
-}
-
-unsigned long
-cl_uc::clocks_of_time(double t)
-{
-  return (unsigned long)(t * xtal);
-}
-
-int
-cl_uc::clock_per_cycle(void)
-{
-  return(1);
+  return(ticks->get_rtime());
 }
 
 void

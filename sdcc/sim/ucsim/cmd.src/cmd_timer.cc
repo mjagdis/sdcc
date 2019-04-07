@@ -30,6 +30,10 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "stdio.h"
 #include "i_string.h"
 
+// prj
+#include "globals.h"
+#include "utils.h"
+
 // sim
 #include "simcl.h"
 
@@ -55,33 +59,33 @@ set_timer_help(class cl_cmd *cmd)
 //		      class cl_cmdline *cmdline, class cl_console *con)
 COMMAND_DO_WORK_UC(cl_timer_cmd)
 {
-  class cl_cmd_arg *params[4]= { cmdline->param(0),
-				 cmdline->param(1),
-				 cmdline->param(2),
-				 cmdline->param(3) };
-  
-  if (!params[0])
+  class cl_cmd_arg *param= cmdline->param(0);
+
+  if (!param)
     {
       con->dd_printf("Timer id is missing.");
       return(false);
     }
-  if (params[0]->as_number())
+  if (param->as_number())
     {
       as_nr= true;
-      id_nr= params[0]->value.number;
-      id_str= 0;
-      if (id_nr <= 0)
+      id_str= NULL;
+      id_nr= param->value.number;
+      if (id_nr < 0)
 	{
 	  con->dd_printf("Error: "
 			 "Timer id must be greater than zero or a string\n");
 	  return(true);
 	}
-      ticker= uc->get_counter(id_nr);
+      else if (id_nr == 0)
+        ticker= uc->ticks;
+      else
+        ticker= uc->get_counter(id_nr);
     }
   else
     {
       as_nr= false;
-      id_str= params[0]->s_value;
+      id_str= strdup(param->s_value);
       ticker= uc->get_counter(id_str);
     }
   cmdline->shift();
@@ -102,50 +106,141 @@ CMDHELP(cl_timer_cmd,
 COMMAND_DO_WORK_UC(cl_timer_add_cmd)
   //add(class cl_uc *uc, class cl_cmdline *cmdline, class cl_console *con)
 {
-  class cl_cmd_arg *params[4]= { cmdline->param(0),
-				 cmdline->param(1),
-				 cmdline->param(2),
-				 cmdline->param(3) };
-  long dir= +1, in_isr= 0;
-
   if (cl_timer_cmd::do_work(uc, cmdline, con))
     return(false);
   if (ticker)
     {
-      if (!as_nr)
-	con->dd_printf("Error: Timer \"%s\" already exists\n", (char*)id_str);
+      if (id_str)
+        {
+          con->dd_printf("Error: Timer \"%s\" already exists\n", id_str);
+          free((char *)id_str);
+        }
       else
 	con->dd_printf("Error: Timer %d already exists\n", id_nr);
       return(false);
     }
 
-  if (cmdline->nuof_params() > 0)
+  class cl_cmd_arg *param = cmdline->param(0);
+  int arg_i = 1;
+  bool rtime = false;
+  double freq = uc->ticks->freq;
+  int dir = +1;
+  enum cpu_state state = stUNDEF;
+  bool inisr = false;
+  bool error = false;
+
+  // Historical syntax was: timer add <name>|<n> <step> [<isr-flag>]
+  // Current syntax is: timer add <name>|<n> [[<step> [<isr-flag>] | <state>] [key [value]]...]
+  if (param && param->as_number())
     {
-      if (cmdline->syntax_match(uc, NUMBER))
-	dir= params[0]->value.number;
-      else if (cmdline->syntax_match(uc, NUMBER NUMBER))
-	{
-	  dir= params[0]->value.number;
-	  in_isr= params[1]->value.number;
-	}
+      state = stGO;
+      dir = param->value.number;
+      freq = uc->xtal / uc->clock_per_cycle();
+      param = cmdline->param(arg_i++);
+
+      if (param && param->as_number())
+        {
+          inisr = (param->value.number != 0);
+          param = cmdline->param(arg_i++);
+        }
+    }
+  else if (param && param->as_string())
+    {
+      // "powerdown" was previously called "halt" and "run" was called "main".
+      // Furthermore "run" (aka "main") only counts non-interrupt execution
+      // and there is an "inisr" that counts excution within an interrupt
+      // service routine.
+      if (!strcmp(param->value.string.string, "halt"))
+        {
+          state = stPD;
+          freq = uc->xtal;
+          dir = +1;
+        }
+      else if (!strcmp(param->value.string.string, "inisr") ||
+          !strcmp(param->value.string.string, "isr"))
+        {
+          state = stGO;
+          inisr = true;
+          freq = uc->xtal / uc->clock_per_cycle();
+          dir = +1;
+        }
+      else if (!strcmp(param->value.string.string, "main"))
+        {
+          state = stGO;
+          inisr = false;
+          freq = uc->xtal / uc->clock_per_cycle();
+          dir = +1;
+        }
+      else
+        {
+          struct id_element *e;
+          for (e = cpu_states; e->id_string && strcasecmp(e->id_string, param->value.string.string); e++);
+          if (e->id_string)
+            {
+              state = (enum cpu_state)e->id;
+              freq = (state == stGO ? uc->xtal / uc->clock_per_cycle() : uc->xtal);
+              dir = +1;
+            }
+          else
+            error = true;
+        }
+      param = cmdline->param(arg_i++);
     }
 
-  if (!as_nr)
+  while (!error && param)
     {
-      ticker= new cl_ticker(dir, in_isr, (char*)id_str);
-      uc->add_counter(ticker, id_str);
+      if (!param->as_string())
+        error = true;
+      else
+        {
+          if (!strcmp(param->value.string.string, "rtime"))
+            {
+              // A (simulated) real-time timer for a _specific_ state.
+              rtime = true;
+            }
+          else if (!strcmp(param->value.string.string, "down") ||
+              !strcmp(param->value.string.string, "dec"))
+            dir = -1;
+          else if (!strcmp(param->value.string.string, "up") ||
+              !strcmp(param->value.string.string, "inc"))
+            dir = +1;
+          else
+            {
+              class cl_cmd_arg *arg = cmdline->param(arg_i++);
+
+              if (!arg)
+                error = true;
+              else
+                {
+                  if (!strcmp(param->value.string.string, "freq"))
+                    error = ((freq = strtod_unscaled((char *)cmdline->tokens->at(arg_i-1))) == 0.0);
+                  else if (!strcmp(param->value.string.string, "step") && arg->as_number())
+                    dir = arg->value.number;
+                  else
+                    error = true;
+                }
+            }
+        }
+
+      param = cmdline->param(arg_i++);
     }
+
+  if (error || param)
+    con->dd_printf("%s\n", (short_help ? short_help : "Error: wrong syntax\n"));
   else
     {
-      ticker= new cl_ticker(dir, in_isr, 0);
-      uc->add_counter(ticker, id_nr);
+      ticker= new cl_ticker(id_str, rtime, (rtime ? uc->ticks->freq : freq), dir, state, inisr);
+      uc->add_counter(ticker, ticker->get_name());
     }
+
+  if (!id_str)
+    free((char *)id_str);
 
   return(false);
 }
 
 CMDHELP(cl_timer_add_cmd,
-	"timer add id [direction [in_isr]]",
+        "timer add <name>|<n> [[<step> [<isr-flag>] | isr|halt|main|<cpustate>] [rtime] [freq <n>] [step <n>]\n",
 	"Create a clock counter (timer)",
 	"log help of timer add")
 
@@ -162,14 +257,20 @@ COMMAND_DO_WORK_UC(cl_timer_delete_cmd)
     return(false);
   if (!ticker)
     {
-      if (!as_nr)
-	con->dd_printf("Timer \"%s\" does not exist\n", (char*)id_str);
+      if (id_str)
+        {
+	  con->dd_printf("Timer \"%s\" does not exist\n", id_str);
+          free((char *)id_str);
+        }
       else
 	con->dd_printf("Timer %d does not exist\n", id_nr);
       return(false);
     }
-  if (!as_nr)
-    uc->del_counter(id_str);
+  if (id_str)
+    {
+      uc->del_counter(id_str);
+      free((char *)id_str);
+    }
   else
     uc->del_counter(id_nr);
 
@@ -177,7 +278,7 @@ COMMAND_DO_WORK_UC(cl_timer_delete_cmd)
 }
 
 CMDHELP(cl_timer_delete_cmd,
-	"timer delete id",
+	"timer delete <name>|<id>",
 	"Delete a timer",
 	"long help of timer delete")
 
@@ -198,25 +299,26 @@ COMMAND_DO_WORK_UC(cl_timer_get_cmd)
   else
     ticker= 0;
   if (ticker)
-    ticker->dump(id_nr, uc->xtal, con);
+    ticker->dump(uc, id_nr, con);
   else
     {
-      uc->ticks->dump(0, uc->xtal, con);
-      uc->isr_ticks->dump(0, uc->xtal, con);
-      uc->idle_ticks->dump(0, uc->xtal, con);
+      uc->ticks->dump(uc, 0, con);
       for (id_nr= 0; id_nr < uc->counters->count; id_nr++)
 	{
 	  ticker= uc->get_counter(id_nr);
 	  if (ticker)
-	    ticker->dump(id_nr, uc->xtal, con);
+	    ticker->dump(uc, id_nr, con);
 	}
     }
+
+  if (id_str)
+    free((char *)id_str);
 
   return(false);
 }
 
 CMDHELP(cl_timer_get_cmd,
-	"timer get [id]",
+	"timer get [<name>|<id>]",
 	"Get value of a timer, or all",
 	"long help of timer get")
 
@@ -233,19 +335,25 @@ COMMAND_DO_WORK_UC(cl_timer_run_cmd)
     return(false);
   if (!ticker)
     {
-      if (!as_nr)
-	con->dd_printf("Timer %s does not exist\n", (char*)id_str);
+      if (id_str)
+        {
+	  con->dd_printf("Timer \"%s\" does not exist\n", id_str);
+          free((char *)id_str);
+        }
       else
 	con->dd_printf("Timer %d does not exist\n", id_nr);
       return(0);
     }
-  ticker->options|= TICK_RUN;
+  ticker->run = true;
+
+  if (id_str)
+    free((char *)id_str);
 
   return(false);
 }
 
 CMDHELP(cl_timer_run_cmd,
-	"timer start id",
+	"timer start <name>|<id>",
 	"Start a timer",
 	"long help of timer run")
 
@@ -263,64 +371,98 @@ COMMAND_DO_WORK_UC(cl_timer_stop_cmd)
 
   if (!ticker)
     {
-      if (!as_nr)
-	con->dd_printf("Timer %s does not exist\n", (char*)id_str);
+      if (id_str)
+        {
+	  con->dd_printf("Timer \"%s\" does not exist\n", id_str);
+          free((char *)id_str);
+        }
       else
 	con->dd_printf("Timer %d does not exist\n", id_nr);
       return(false);
     }
-  ticker->options&= ~TICK_RUN;
+  ticker->run = false;
+
+  if (id_str)
+    free((char *)id_str);
 
   return(false);
 }
 
 CMDHELP(cl_timer_stop_cmd,
-	"timer stop id",
+	"timer stop <name>|<id>",
 	"Stop a timer",
 	"long help of timer stop")
 
 /*
- * Command: timer value
+ * Command: timer ticks
  *-----------------------------------------------------------------------------
- * Set a timer to a specified value
+ * Set a timer to a specified tick count
  */
 
-COMMAND_DO_WORK_UC(cl_timer_value_cmd)
+COMMAND_DO_WORK_UC(cl_timer_ticks_cmd)
   //val(class cl_uc *uc, class cl_cmdline *cmdline, class cl_console *con)
 {
-  /*class cl_cmd_arg *params[4]= { cmdline->param(0),
-				 cmdline->param(1),
-				 cmdline->param(2) };*/
-  
+  char *arg;
+
   if (cl_timer_cmd::do_work(uc, cmdline, con))
     return(false);
   if (!ticker)
     {
-      if (!as_nr)
-	con->dd_printf("Error: Timer %s does not exist\n", (char*)id_str);
+      if (id_str)
+	con->dd_printf("Error: Timer \"%s\" does not exist\n", id_str);
       else
 	con->dd_printf("Error: Timer %d does not exist\n", id_nr);
-      return(false);
     }
-  if (cmdline->param(0) == NULL)
-    {
-      con->dd_printf("Error: Value is missing\n");
-      return(false);
-    }
-  long val;
-  if (!cmdline->param(0)->get_ivalue(&val))
-    {
-      con->dd_printf("Error: Wrong parameter\n");
-      return(false);
-    }
-  ticker->ticks= val;
+  else if ((arg = (char *)cmdline->tokens->at(0)))
+    ticker->ticks= strtod_unscaled(arg);
+  else
+    con->dd_printf("Error: Value is missing\n");
+
+  if (id_str)
+    free((char *)id_str);
 
   return(false);
 }
 
-CMDHELP(cl_timer_value_cmd,
-	"timer set id value",
+CMDHELP(cl_timer_ticks_cmd,
+	"timer ticks <name>|<id> value",
 	"Set a timer value",
-	"long help of timer set")
+	"long help of timer ticks")
+
+/*
+ * Command: timer time
+ *-----------------------------------------------------------------------------
+ * Set a timer to a specified time
+ */
+
+COMMAND_DO_WORK_UC(cl_timer_time_cmd)
+  //val(class cl_uc *uc, class cl_cmdline *cmdline, class cl_console *con)
+{
+  char *arg;
+
+  if (cl_timer_cmd::do_work(uc, cmdline, con))
+    return(false);
+  if (!ticker)
+    {
+      if (id_str)
+	con->dd_printf("Error: Timer \"%s\" does not exist\n", id_str);
+      else
+	con->dd_printf("Error: Timer %d does not exist\n", id_nr);
+    }
+  else if ((arg = (char *)cmdline->tokens->at(0)))
+    ticker->ticks= strtod_unscaled(arg) * ticker->freq;
+  else
+    con->dd_printf("Error: Value is missing\n");
+
+  if (id_str)
+    free((char *)id_str);
+
+  return(false);
+}
+
+CMDHELP(cl_timer_time_cmd,
+	"timer time <name>|<id> value",
+	"Set a timer value",
+	"long help of timer time")
 
 /* End of cmd.src/cmd_timer.cc */

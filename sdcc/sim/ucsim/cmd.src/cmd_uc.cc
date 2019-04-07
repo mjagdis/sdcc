@@ -63,13 +63,13 @@ COMMAND_DO_WORK_UC(cl_state_cmd)
   con->dd_printf("Total time since last reset= %g sec (%lu clks)\n",
 		 uc->get_rtime(), (unsigned long)(uc->ticks->ticks));
   con->dd_printf("Time in isr = %g sec (%lu clks) %3.2g%%\n",
-		 uc->isr_ticks->get_rtime(uc->xtal),
+		 uc->isr_ticks->get_rtime(),
 		 uc->isr_ticks->ticks,
 		 (uc->ticks->ticks == 0)?0.0:
 		 (100.0*((double)(uc->isr_ticks->ticks)/
 			 (double)(uc->ticks->ticks))));
   con->dd_printf("Time in idle= %g sec (%lu clks) %3.2g%%\n",
-		 uc->idle_ticks->get_rtime(uc->xtal),
+		 uc->idle_ticks->get_rtime(),
 		 uc->idle_ticks->ticks,
 		 (uc->ticks->ticks == 0)?0.0:
 		 (100.0*((double)(uc->idle_ticks->ticks)/

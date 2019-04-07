@@ -60,7 +60,8 @@ struct id_element mem_classes[]= {
 };
 
 struct id_element cpu_states[]= {
-  { stGO,	"OK" },
+  { stUNDEF,	"All" },
+  { stGO,	"Run" },
   { stIDLE,	"Idle" },
   { stPD,	"PowerDown" },
   { 0, 0 }

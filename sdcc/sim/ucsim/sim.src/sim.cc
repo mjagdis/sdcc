@@ -251,7 +251,7 @@ cl_sim::stop(int reason, class cl_ev_brk *ebrk)
 	cmd->frozen_console->dd_printf("Simulated %lu ticks in %f sec, rate=%f\n",
 				       dt,
 				       stop_at - start_at,
-				       (dt*(1/uc->xtal)) / (stop_at - start_at));
+				       (dt*(1/uc->ticks->freq)) / (stop_at - start_at));
       //if (cmd->actual_console != cmd->frozen_console)
       cmd->frozen_console->set_flag(CONS_FROZEN, false);
       //cmd->frozen_console->dd_printf("_s_");

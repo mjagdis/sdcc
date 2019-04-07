@@ -42,8 +42,8 @@ protected:
     *cell_ta, *cell_cor, *cell_mcnt0, *cell_mcnt1,
     *cell_ma, *cell_mb, *cell_mc, *cell_wdcon, *cell_c1c;
   class cl_uc390 *uc390;
-  unsigned long ctm_ticks; /* mini-state-machine for "crystal multiplier" */
-  unsigned long timed_access_ticks;
+  long ctm_ticks; /* mini-state-machine for "crystal multiplier" */
+  long timed_access_ticks;
   int timed_access_state; /* 0: idle; 1: $aa written; 2: $55 written */
 public:
   cl_uc390_hw (class cl_uc *auc);

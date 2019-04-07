@@ -549,9 +549,9 @@ cl_vcd::set_cmd(class cl_cmdline *cmdline, class cl_console_base *con)
                       if (!timescale)
                         {
                           timescale = 1e3;
-                          while (timescale * 1.0 / uc->xtal < 1.0)
+                          while (timescale * 1.0 / uc->ticks->freq < 1.0)
                             timescale *= 1000.0;
-                          if (fmod(timescale * 1.0 / uc->xtal, 1.0) > 0.0)
+                          if (fmod(timescale * 1.0 / uc->ticks->freq, 1.0) > 0.0)
                             timescale *= 1000.0;
                         }
 

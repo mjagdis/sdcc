@@ -757,55 +757,105 @@ Address decoders:
     Handling of timers. Don't be confused! This command doesn't handle timer
     element of the controller. It manages "clock counters" which can be used to
     profile applications.
+    <p>Timers to measure the time spent in each possible CPU state are created
+    by default initially. As simulation progresses timers that measure both
+    time and clock ticks at the then current CPU or hardware (depending on state)
+    frequency are created as necessary.</p>
     <p>Known subcommands are: </p>
     <p>timer <a href="#timer_add">add</a> <br>
       timer <a href="#timer_delete">delete</a> <br>
       timer <a href="#timer_get">get</a> <br>
       timer <a href="#timer_start">start</a> <br>
       timer <a href="#timer_stop">stop</a> <br>
-      timer <a href="#timer_set">set</a> </p>
+      timer <a href="#timer_ticks">ticks</a> </p>
+      timer <a href="#timer_time">time</a> </p>
     <p>Each subcommand can (some must) be followed by a timer id which can be a
       number or a string. Timers are numbered from 1. You can use any number
       greater than 0 to identify a timer. Or you can use a simbolic name, in
       this case simulator uses the first unused number to allocate a new timer.
     </p>
     <blockquote>
-      <h4><a name="timer_add">timer add|create|make <i>id [direction [in_isr]]</i></a></h4>
+      <h4><a name="timer_add">timer add|create|make
+            <i>name</i>|<i>n</i> [[<i>step</i> [<i>isr-flag</i>] | <i>state</i>] [rtime] [freq <i>n</i>] [step <i>n</i>]
+         </a></h4>
       To create a new timer. New timers are turned ON by default and initialized
-      to value 0. <b>Direction</b> is an integer (can be positive or negative)
-      number which is added to the actual value in every step. If <b>in_isr</b>
-      is TRUE the timer counts only when execution is in an interrupt handler.
+      to value 0. <b>Step</b> is an integer (can be positive or negative)
+      number which is added to the actual value in every step. <b>state</b> is used
+      to say that the timer only accumulates time for a given CPU state, e.g. run,
+      idle, powerdown etc. If <b>isr</b> is given the timer counts only when
+      execution is in an interrupt handler. <b>rtime</b> says that the timer only
+      accumulates (simulated) time and does not count ticks for a specific clock
+      frequency. For timers that do count ticks the clock frequency they are active
+      for is given by <b>freq</b>. This will default to the current CPU frequency for
+      timers for the "run" and "inisr" states and to the current HW frequency for
+      all other states.
+      <p>Timers are created as necesary automatically as HW and CPU clocks change
+      (where the MCU being emulated offers methods to change clocks programmatically).</p>
       <hr>
-      <h4><a name="timer_delete">timer delete|remove <i>id</i></a></h4>
+      <h4><a name="timer_delete">timer delete|remove <i>name</i>|<i>n</i></a></h4>
       To remove a timer if you don't need it any more.
       <hr>
-      <h4><a name="timer_get">timer get <i>[id]</i></a></h4>
+      <h4><a name="timer_get">timer get [<i>name</i>|<i>n</i>]</a></h4>
       To get value of timers. If you don't use timer id in this command
       simulator prints out value of all timers including predefined ones. See
       example below.
       <hr>
-      <h4><a name="timer_start">timer start|run <i>id</i></a></h4>
+      <h4><a name="timer_start">timer start|run <i>name</i>|<i>n</i></a></h4>
       To turn a timer ON.
       <hr>
-      <h4><a name="timer_stop">timer stop <i>id</i></a></h4>
-      To turn a timer OFF. It still exist but doesn't count xtal periods.
+      <h4><a name="timer_stop">timer stop <i>name</i>|<i>n</i></a></h4>
+      To turn a timer OFF. It still exists but doesn't count ticks or time.
       <hr>
-      <h4><a name="timer_set">timer set|value <i>id value</i></a></h4>
-      To set value of the timer (number of xtal periods). <b>value</b> is the
-      new value.
+      <h4><a name="timer_ticks">timer ticks <i>name</i>|<i>n</i> <i>value</i></a></h4>
+      Set the timer's number of ticks to the given <b>value</b>. By implication the
+      timer's time value is also set based on the frequency for the timer.
+      <h4><a name="timer_time">timer time <i>name</i>|<i>n</i> <i>value</i></a></h4>
+      Set the timer's time to the given <b>value</b>. By implication the timer's
+      tick value is also set based on the frequency of the timer (although the tick value
+      and frequency are hidden for rtime timers). Where the time requested cannot be
+      represented by an exact number of ticks it is rounded down to the nearest tick.
       <pre>0&gt; <font color="#118811">tim a 3</font>
-0&gt; <font color="#118811">tim g</font>
-timer #0("time") ON: 0.463255 sec (5123232 clks)
-timer #0("isr") ON: 0.0051888 sec (57384 clks)
-timer #0("idle") ON,ISR: 0 sec (0 clks)
-timer #3("unnamed") ON: 0 sec (0 clks)
-0&gt; <font color="#118811">tim a "a"</font>
-0&gt; <font color="#118811">tim g</font>
-timer #0("time") ON: 0.463255 sec (5123232 clks)
-timer #0("isr") ON: 0.0051888 sec (57384 clks)
-timer #0("idle") ON,ISR: 0 sec (0 clks)
-timer #1("a") ON: 0 sec (0 clks)
-timer #3("unnamed") ON: 0 sec (0 clks)
+0&gt; <font color="#118811">timer get</font>
+timer #  0 time      ON: inc   0%  0.000000000000000 sec
+timer #  1 main      ON: inc   0%  0.000000000000000 sec Run (not ISR)   
+timer #  2 inisr     ON: inc   0%  0.000000000000000 sec Run (in ISR)    
+timer #  3 idle      ON: inc   0%  0.000000000000000 sec Idle
+0&gt; <font color="#118811">step</font>
+[...]
+0&gt; <font color="#118811">timer get</font>
+timer #  0 time      ON: inc 100%  0.000001085069444 sec
+timer #  1 main      ON: inc 100%  0.000001085069444 sec Run (not ISR)
+timer #  2 inisr     ON: inc   0%  0.000000000000000 sec Run (in ISR)
+timer #  3 idle      ON: inc   0%  0.000000000000000 sec Idle
+timer #  4           ON: inc 100%  0.000001085069444 sec Run (not ISR)    1 clks @ 921600Hz
+1&gt; <font color="#118811">timer add test1 powerdown freq 10.5MHz</font>
+1&gt; <font color="#118811">timer add test2 run dec</font>
+1&gt; <font color="#118811">timer time test2 1ms</font>
+0&gt; <font color="#118811">timer get</font>
+timer #  0 time      ON: inc 100%  0.000001085069444 sec
+timer #  1 main      ON: inc 100%  0.000001085069444 sec Run (not ISR)
+timer #  2 inisr     ON: inc   0%  0.000000000000000 sec Run (in ISR)
+timer #  3 idle      ON: inc   0%  0.000000000000000 sec Idle
+timer #  4           ON: inc 100%  0.000001085069444 sec Run (not ISR)    1 clks @ 921600Hz
+timer #  5 test      ON: inc   0%  0.000000000000000 sec PowerDown        0 clks @ 10500kHz
+timer #  6 test2     ON: dec       0.000999348958333 sec Run (not ISR)    921 clks @ 921600Hz
+0&gt; <font color="#118811">timer get</font>
+timer #  0 time      ON: 100% 0.000001085069444 sec
+timer #  1 main      ON: 100% 0.000001085069444 sec Run (not ISR)   
+timer #  2 inisr     ON:   0% 0.000000000000000 sec Run (in ISR)    
+timer #  3 idle      ON:   0% 0.000000000000000 sec Idle            
+timer #  4           ON: 100% 0.000001085069444 sec Run (not ISR)    1 clks @ 921600Hz
+timer #  5 test      ON:   0% 0.000000000000000 sec PowerDown        0 clks @ 10MHz
+0&gt; <font color="#118811">step</font>
+[...]
+0&gt; <font color="#118811">timer get</font>
+timer #  0 time      ON: inc 100%  0.000002170138889 sec
+timer #  1 main      ON: inc 100%  0.000002170138889 sec Run (not ISR)   
+timer #  2 inisr     ON: inc   0%  0.000000000000000 sec Run (in ISR)    
+timer #  3 idle      ON: inc   0%  0.000000000000000 sec Idle            
+timer #  4           ON: inc 100%  0.000002170138889 sec Run (not ISR)    2 clks @ 921600Hz
+timer #  5 test      ON: inc   0%  0.000000000000000 sec PowerDown        0 clks @ 10500kHz
+timer #  6 test2     ON: dec       0.000998263888889 sec Run (not ISR)    920 clks @ 921600Hz
 0&gt; 
 </pre> </blockquote>
     <hr>

@@ -152,76 +152,77 @@ COMMAND_DO_WORK_SIM(cl_step_cmd)
     {
       chars s= params[1]->get_svalue();
       unsigned long do_clk;
-      class cl_time_measurer *tm= NULL;
       do_clk= instrs;
       if (s == "clk")
-	{
-	  tm= new cl_time_clk(uc);
-	  tm->init();
-	  tm->from_now(do_clk);
-	}
+        {
+          class cl_time_clk *tm= new cl_time_clk(uc);
+          tm->init();
+          tm->from_now(do_clk);
+          uc->stop_when(tm);
+        }
       else if ((s == "s") || (s == "sec"))
-	{
-	  do_clk= uc->clocks_of_time(instrs);
-	  tm= new cl_time_clk(uc);
-	  tm->init();
-	  tm->from_now(do_clk);
-	}
+        {
+          class cl_time_rtime *tm= new cl_time_rtime(uc);
+          tm->init();
+          tm->from_now((double)do_clk);
+          uc->stop_when(tm);
+        }
       else if ((s == "ms") || (s == "msec"))
-	{
-	  do_clk= uc->clocks_of_time(instrs/1000.0);
-	  tm= new cl_time_clk(uc);
-	  tm->init();
-	  tm->from_now(do_clk);
-	}
+        {
+          class cl_time_rtime *tm= new cl_time_rtime(uc);
+          tm->init();
+          tm->from_now((double)do_clk / 1000.0);
+          uc->stop_when(tm);
+        }
       else if ((s == "us") || (s == "usec"))
-	{
-	  do_clk= uc->clocks_of_time(instrs/1000000.0);
-	  tm= new cl_time_clk(uc);
-	  tm->init();
-	  tm->from_now(do_clk);
-	}
+        {
+          class cl_time_rtime *tm= new cl_time_rtime(uc);
+          tm->init();
+          tm->from_now((double)do_clk / 1000000.0);
+          uc->stop_when(tm);
+        }
       else if ((s == "ns") || (s == "nsec"))
-	{
-	  do_clk= uc->clocks_of_time(instrs/1000000000.0);
-	  tm= new cl_time_clk(uc);
-	  tm->init();
-	  tm->from_now(do_clk);
-	}
+        {
+          class cl_time_rtime *tm= new cl_time_rtime(uc);
+          tm->init();
+          tm->from_now((double)do_clk / 1000000000.0);
+          uc->stop_when(tm);
+        }
       else if (s == "vclk")
-	{
-	  tm= new cl_time_vclk(uc);
-	  tm->init();
-	  tm->from_now(do_clk);
-	}
+        {
+          class cl_time_vclk *tm= new cl_time_vclk(uc);
+          tm->init();
+          tm->from_now(do_clk);
+          uc->stop_when(tm);
+        }
       else if ((s == "fclk") || (s == "fetch"))
-	{
-	  tm= new cl_time_fclk(uc);
-	  tm->init();
-	  tm->from_now(do_clk);
-	}
+        {
+          class cl_time_fclk *tm= new cl_time_fclk(uc);
+          tm->init();
+          tm->from_now(do_clk);
+          uc->stop_when(tm);
+        }
       else if ((s == "rclk") || (s == "read"))
-	{
-	  tm= new cl_time_rclk(uc);
-	  tm->init();
-	  tm->from_now(do_clk);
-	}
+        {
+          class cl_time_rclk *tm= new cl_time_rclk(uc);
+          tm->init();
+          tm->from_now(do_clk);
+          uc->stop_when(tm);
+        }
       else if ((s == "wclk") || (s == "write"))
-	{
-	  tm= new cl_time_wclk(uc);
-	  tm->init();
-	  tm->from_now(do_clk);
-	}
+        {
+          class cl_time_wclk *tm= new cl_time_wclk(uc);
+          tm->init();
+          tm->from_now(do_clk);
+          uc->stop_when(tm);
+        }
       else
-	{
-	  con->dd_printf("Unknown unit.\n");
-	  return 0;
-	}
-      if (tm)
-	{
-	  uc->stop_when(tm);
-	  sim->start(con, 0);
-	}
+        {
+          con->dd_printf("Unknown unit.\n");
+          return 0;
+        }
+
+      sim->start(con, 0);
       return 0;
     }
   if (instrs <= 0)

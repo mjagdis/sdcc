@@ -47,24 +47,23 @@ typedef int (*instruction_wrapper_fn)(class cl_uc *uc, t_mem code);
 
 /* Counter to count clock ticks */
 
-#define TICK_RUN	0x01
-#define TICK_INISR	0x02
-#define TICK_IDLE	0x03
-
 class cl_ticker: public cl_base
 {
 public:
-  unsigned long ticks;
-  int options; // see TICK_XXX above
+  bool rtime;
+  double freq;
+  long ticks;
   int dir;
-  //char *name;
+  enum cpu_state state;
+  bool run;
+  bool inisr;
 
-  cl_ticker(int adir, int in_isr, const char *aname);
+  cl_ticker(const char *aname, bool artime, double afreq, int adir = +1, enum cpu_state astate = stGO, bool ainisr = false);
   virtual ~cl_ticker(void);
-  
-  virtual int tick(int nr);
-  virtual double get_rtime(double xtal);
-  virtual void dump(int nr, double xtal, class cl_console_base *con);
+
+  virtual void tick(int nr);
+  virtual double get_rtime(void);
+  virtual void dump(class cl_uc *uc, int nr, class cl_console_base *con);
 };
 
 
@@ -88,48 +87,59 @@ struct vcounter_t {
 class cl_time_measurer: public cl_base
 {
 public:
-  unsigned long to_reach;
   class cl_uc *uc;
 public:
   cl_time_measurer(class cl_uc *the_uc);
-  virtual void set_reach(unsigned long val);
-  virtual void from_now(unsigned long val);
+  virtual bool reached() = 0;
+};
+
+class cl_time_rtime: public cl_time_measurer
+{
+private:
+  double to_reach;
+public:
+  cl_time_rtime(class cl_uc *the_uc): cl_time_measurer(the_uc) { set_name("rtime"); to_reach = 0.0; }
+  virtual void from_now(double val);
   virtual bool reached();
-  virtual unsigned long now();
 };
 
 class cl_time_clk: public cl_time_measurer
 {
+private:
+  unsigned long to_reach;
 public:
-  cl_time_clk(class cl_uc *the_uc): cl_time_measurer(the_uc) { set_name("clk"); }
+  cl_time_clk(class cl_uc *the_uc): cl_time_measurer(the_uc) { set_name("clk"); to_reach = 0; }
   virtual unsigned long now();
+  virtual void set_reach(unsigned long val);
+  virtual void from_now(unsigned long val);
+  virtual bool reached();
 };
   
-class cl_time_vclk: public cl_time_measurer
+class cl_time_vclk: public cl_time_clk
 {
 public:
-  cl_time_vclk(class cl_uc *the_uc): cl_time_measurer(the_uc) { set_name("vclk"); }
+  cl_time_vclk(class cl_uc *the_uc): cl_time_clk(the_uc) { set_name("vclk"); }
   virtual unsigned long now();
 };
 
-class cl_time_fclk: public cl_time_measurer
+class cl_time_fclk: public cl_time_clk
 {
 public:
-  cl_time_fclk(class cl_uc *the_uc): cl_time_measurer(the_uc) { set_name("fclk"); }
+  cl_time_fclk(class cl_uc *the_uc): cl_time_clk(the_uc) { set_name("fclk"); }
   virtual unsigned long now();
 };
 
-class cl_time_rclk: public cl_time_measurer
+class cl_time_rclk: public cl_time_clk
 {
 public:
-  cl_time_rclk(class cl_uc *the_uc): cl_time_measurer(the_uc) { set_name("rclk"); }
+  cl_time_rclk(class cl_uc *the_uc): cl_time_clk(the_uc) { set_name("rclk"); }
   virtual unsigned long now();
 };
 
-class cl_time_wclk: public cl_time_measurer
+class cl_time_wclk: public cl_time_clk
 {
 public:
-  cl_time_wclk(class cl_uc *the_uc): cl_time_measurer(the_uc) { set_name("wclk"); }
+  cl_time_wclk(class cl_uc *the_uc): cl_time_clk(the_uc) { set_name("wclk"); }
   virtual unsigned long now();
 };
 
@@ -192,15 +202,16 @@ public:
   struct cpu_entry *type;
   //enum cpu_type type;			// CPU family
   //int technology;		// CMOS, HMOS
-  int state;			// GO, IDLE, PD
+  enum cpu_state state;			// GO, IDLE, PD
   //class cl_list *options;
   class cl_xtal_option *xtal_option;
 
   t_addr PC, instPC;		// Program Counter
   bool inst_exec;		// Instruction is executed
-  class cl_ticker *ticks;	// Nr of XTAL clocks
-  class cl_ticker *isr_ticks;	// Time in ISRs
-  class cl_ticker *idle_ticks;	// Time in idle mode
+  class cl_ticker *ticks;	// Time elapsed according to the HW clock
+  class cl_ticker *isr_ticks;  // Time executing in ISRs
+  class cl_ticker *idle_ticks; // Time in idle mode
+  class cl_ticker *main_ticks; // Time executing in main (non ISR) mode
   class cl_list *counters;	// User definable timers (tickers)
   int inst_ticks;		// ticks of an instruction
   double xtal;			// Clock speed
@@ -290,6 +301,7 @@ public:
   virtual int tick_hw(int cycles);
   virtual void do_extra_hw(int cycles);
   virtual int tick(int cycles);
+  virtual int update_tickers(bool rtime, double freq, int cycles);
   virtual class cl_ticker *get_counter(int nr);
   virtual class cl_ticker *get_counter(const char *nam);
   virtual void add_counter(class cl_ticker *ticker, int nr);
@@ -297,8 +309,7 @@ public:
   virtual void del_counter(int nr);
   virtual void del_counter(const char *nam);
   virtual double get_rtime(void);
-  virtual unsigned long clocks_of_time(double t);
-  virtual int clock_per_cycle(void);
+  virtual int clock_per_cycle(void) { return 1; }
   virtual void touch(void);
   
   // execution
