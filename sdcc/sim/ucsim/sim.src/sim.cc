@@ -92,14 +92,16 @@ cl_sim::step(void)
   if (state & SIM_GO)
     {
       if (steps_done == 0)
-	{
-	  start_at= dnow();
-	}
-      if (uc->do_inst(1) == resGO)
-	steps_done++;
-      if ((steps_todo > 0) &&
-	  (steps_done >= steps_todo))
-	stop(resSTEP);
+        start_at= dnow();
+
+      int reason = uc->do_inst(1);
+
+      if (reason == resGO || reason == resNOT_DONE)
+        {
+          steps_done++;
+          if (reason == resGO && --steps_todo <= 0)
+            stop(resSTEP);
+        }
     }
   return(0);
 }
@@ -241,6 +243,9 @@ cl_sim::stop(int reason, class cl_ev_brk *ebrk)
 	case resSIMIF:
 	  cmd->frozen_console->dd_printf("Program stopped itself\n");
 	  break;
+        case resNOT_DONE:
+          cmd->frozen_console->dd_printf("Instruction is still executing\n");
+          break;
 	default:
 	  cmd->frozen_console->dd_printf("Unknown reason\n");
 	  break;
@@ -249,10 +254,10 @@ cl_sim::stop(int reason, class cl_ev_brk *ebrk)
       unsigned long dt= uc?(uc->ticks->ticks - start_tick):0;
       if ((reason != resSTEP) ||
 	  (steps_done > 1))
-	cmd->frozen_console->dd_printf("Simulated %lu ticks in %f sec, rate=%f\n",
-				       dt,
-				       stop_at - start_at,
-				       (dt*(1/uc->ticks->freq)) / (stop_at - start_at));
+        cmd->frozen_console->dd_printf("Simulated %.0f ticks in %.15f sec, rate=%.15f\n",
+                                       dt * uc->xtal / uc->ticks->freq,
+                                       stop_at - start_at,
+                                       (dt * uc->xtal / uc->ticks->freq) / (stop_at - start_at));
       //if (cmd->actual_console != cmd->frozen_console)
       cmd->frozen_console->set_flag(CONS_FROZEN, false);
       //cmd->frozen_console->dd_printf("_s_");

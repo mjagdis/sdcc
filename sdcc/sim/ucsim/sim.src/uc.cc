@@ -2208,8 +2208,7 @@ cl_uc::do_inst(int step)
       
       post_inst();
 
-      if ((res == resGO) &&
-	  irq)
+      if (irq && (res == resGO || res == resNOT_DONE))
 	{
 	  //printf("DO INTERRUPT PC=%lx\n", PC);
 	  int r= do_interrupt();
@@ -2225,7 +2224,7 @@ cl_uc::do_inst(int step)
 	  res= resBREAKPOINT;
 	}
     }
-  if (res != resGO)
+  if (res != resGO && res != resNOT_DONE)
     sim->stop(res);
   return(res);
 }
