@@ -400,6 +400,18 @@ public:
 
 #include "errorcl.h"
 
+class cl_errata: public cl_error
+{
+ private:
+  const char *msg;
+ public:
+  bool notified;
+
+  cl_errata(const char *amsg);
+
+  virtual void print(class cl_commander_base *c);
+};
+
 class cl_error_timer_expired: public cl_error
 {
  protected:
