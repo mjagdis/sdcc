@@ -1573,7 +1573,15 @@ cl_stm8::exec_inst(void)
                          state = il->state;
                        }
                      else
-                       context_restore();
+                       {
+                         static bool notified = false;
+                         if (!notified && il->state == stPD)
+                           {
+                             notified = true;
+                             error(new cl_errata("Activation level (AL bit) not functional in Halt mode."));
+                           }
+                         context_restore();
+                       }
                    }
                  else
                    context_restore();
