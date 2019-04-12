@@ -198,9 +198,10 @@ bool
 cl_cmd_arg::as_bit(class cl_uc *uc)
 {
   return(get_bit_address(uc,
-			 &(value.bit.mem),
-			 &(value.bit.mem_address),
-			 &(value.bit.mask)));
+                         &(value.bit.mem),
+                         &(value.bit.mem_address),
+                         &(value.bit.bitnr_high),
+                         &(value.bit.bitnr_low)));
 }
 
 
@@ -223,18 +224,26 @@ cl_cmd_int_arg::get_address(class cl_uc *uc, t_addr *addr)
 
 bool
 cl_cmd_int_arg::get_bit_address(class cl_uc *uc, // input
-				class cl_address_space **mem, // outputs
-				t_addr *mem_addr,
-				t_mem *bit_mask)
+                                class cl_address_space **mem, // outputs
+                                t_addr *mem_addr,
+                                int *bitnr_high,
+                                int *bitnr_low)
 {
   t_addr bit_addr;
 
   if (!get_address(uc, &bit_addr))
     return(false);
   
+  if (bitnr_high)
+    *bitnr_high = -1;
+  if (bitnr_low)
+    *bitnr_low = -1;
+
   if (mem)
-    *mem= uc->bit2mem(bit_addr, mem_addr, bit_mask);
-  return(mem && *mem);
+    if (!(*mem= uc->bit2mem(bit_addr, mem_addr, bitnr_high, bitnr_low)))
+      *mem = uc->rom;
+
+  return(true);
 }
 
 bool
@@ -280,9 +289,10 @@ cl_cmd_sym_arg::get_address(class cl_uc *uc, t_addr *addr)
 
 bool
 cl_cmd_sym_arg::get_bit_address(class cl_uc *uc, // input
-				class cl_address_space **mem, // outputs
-				t_addr *mem_addr,
-				t_mem *bit_mask)
+                                class cl_address_space **mem, // outputs
+                                t_addr *mem_addr,
+                                int *bitnr_high,
+                                int *bitnr_low)
 {
   /*
   struct name_entry *ne;
@@ -298,20 +308,13 @@ cl_cmd_sym_arg::get_bit_address(class cl_uc *uc, // input
   if (v)
     {
       if (mem)
-	*mem= v->as;
+        *mem= v->as;
       if (mem_addr)
-	*mem_addr= v->addr;
-      if (bit_mask)
-	{
-	  if (v->bitnr < 0)
-	    {
-	      *bit_mask= 1;
-	    }
-	  else
-	    {
-	      *bit_mask= 1 << v->bitnr;
-	    }
-	}
+        *mem_addr= v->addr;
+      if (bitnr_high)
+        *bitnr_high= v->bitnr_high;
+      if (bitnr_low)
+        *bitnr_low= v->bitnr_low;
       return true;
     }
   return false;
@@ -372,19 +375,22 @@ cl_cmd_str_arg::cl_cmd_str_arg(const char *str):
 /* Bit */
 
 cl_cmd_bit_arg::cl_cmd_bit_arg(/*class cl_uc *iuc,*/
-			       class cl_cmd_arg *asfr, class cl_cmd_arg *abit):
+                               class cl_cmd_arg *asfr, class cl_cmd_arg *abit_low, class cl_cmd_arg *abit_high):
   cl_cmd_arg(/*iuc,*/ (long)0)
 {
   sfr= asfr;
-  bit= abit;
+  bit_low= abit_low;
+  bit_high= abit_high;
 }
 
 cl_cmd_bit_arg::~cl_cmd_bit_arg(void)
 {
   if (sfr)
     delete sfr;
-  if (bit)
-    delete bit;
+  if (bit_low)
+    delete bit_low;
+  if (bit_high)
+    delete bit_high;
 }
 
 bool
@@ -397,32 +403,42 @@ cl_cmd_bit_arg::get_address(class cl_uc *uc, t_addr *addr)
 
 bool
 cl_cmd_bit_arg::get_bit_address(class cl_uc *uc, // input
-				class cl_address_space **mem, // outputs
-				t_addr *mem_addr,
-				t_mem *bit_mask)
+                                class cl_address_space **mem, // outputs
+                                t_addr *mem_addr,
+                                int *bitnr_high,
+                                int *bitnr_low)
 {
-  if (mem)
+  if (!sfr || !bitnr_high || !bitnr_low)
+    return(false);
+
+  if (mem || mem_addr)
+    sfr->get_bit_address(uc, mem, mem_addr, NULL, NULL);
+
+  long l;
+
+  if (!bit_low ||
+      !bit_low->get_ivalue(&l) ||
+      l < 0 ||
+      l >= (long)sizeof(t_mem)*8)
+    return(false);
+  *bitnr_low = *bitnr_high = l;
+
+  if (bit_high)
     {
-      *mem= uc->address_space(MEM_SFR_ID);
-      if (!*mem)
-	return(false);
+      if (!bit_high->get_ivalue(&l) ||
+          l < 0 ||
+          l >= (long)sizeof(t_mem)*8)
+        return(false);
+      *bitnr_high = l;
     }
-  if (mem_addr)
+
+  if (*bitnr_low > *bitnr_high)
     {
-      if (!sfr ||
-	  !sfr->get_address(uc, mem_addr))
-	return(false);
+      int t = *bitnr_low;
+      *bitnr_low = *bitnr_high;
+      *bitnr_high = t;
     }
-  if (bit_mask)
-    {
-      if (!bit)
-	return(false);
-      long l;
-      if (!bit->get_ivalue(&l) ||
-	  l > 7)
-	return(false);
-      *bit_mask= 1 << l;
-    }
+
   return(true);
 }
 
@@ -447,6 +463,37 @@ cl_cmd_array_arg::~cl_cmd_array_arg(void)
 }
 
 bool
+cl_cmd_array_arg::get_bit_address(class cl_uc *uc, // input
+                                class cl_address_space **mem, // outputs
+                                t_addr *mem_addr,
+                                int *bitnr_high,
+                                int *bitnr_low)
+{
+  // address_space[address]
+  char *n;
+  t_addr a;
+  if (name_arg == 0 ||
+      index == 0 ||
+      (n= name_arg->get_svalue()) == NULL ||
+      !index->get_address(uc, &a))
+    return false;
+  class cl_memory *m= uc->memory(n);
+  if (!m ||
+      !m->is_address_space() ||
+      !m->valid_address(a))
+    return false;
+  if (mem)
+    *mem = (cl_address_space *)m;
+  if (mem_addr)
+    *mem_addr = a;
+  if (bitnr_high)
+    *bitnr_high = -1;
+  if (bitnr_low)
+    *bitnr_low = -1;
+  return true;
+}
+
+bool
 cl_cmd_array_arg::as_hw(class cl_uc *uc)
 {
   char *n;
@@ -465,20 +512,13 @@ cl_cmd_array_arg::as_hw(class cl_uc *uc)
 bool
 cl_cmd_array_arg::as_cell(class cl_uc *uc)
 {
-  // address_space[address]
-  char *n;
+  class cl_address_space *m;
   t_addr a;
-  if (name_arg == 0 ||
-      index == 0 ||
-      (n= name_arg->get_svalue()) == NULL ||
-      !index->get_address(uc, &a))
+
+  if (!get_bit_address(uc, &m, &a, NULL, NULL))
     return false;
-  class cl_memory *m= uc->memory(n);
-  if (!m)
-    return false;
-  if (!m->is_address_space())
-    return false;
-  value.cell= ((cl_address_space*)m)->get_cell(a);
+
+  value.cell= m->get_cell(a);
   return value.cell != NULL;
 }
 

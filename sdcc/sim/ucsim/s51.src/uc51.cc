@@ -1398,7 +1398,7 @@ cl_51core::print_regs(class cl_console_base *con)
  */
 
 class cl_address_space *
-cl_51core::bit2mem(t_addr bitaddr, t_addr *memaddr, t_mem *bitmask)
+cl_51core::bit2mem(t_addr bitaddr, t_addr *memaddr, int *bitnr_high, int *bitnr_low)
 {
   class cl_address_space *m;
   t_addr ma;
@@ -1416,8 +1416,12 @@ cl_51core::bit2mem(t_addr bitaddr, t_addr *memaddr, t_mem *bitmask)
     }
   if (memaddr)
     *memaddr= ma;
-  if (bitmask)
-    *bitmask= 1 << (bitaddr & 0x7);
+  if (bitnr_low)
+    {
+      *bitnr_low= (bitaddr & 0x7);
+      if (bitnr_high)
+        *bitnr_high = *bitnr_low;
+    }
   return(m);
 }
 

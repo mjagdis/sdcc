@@ -224,19 +224,29 @@ COMMAND_DO_WORK_UC(cl_dump_cmd)
       while (params[0] &&
 	     params[0]->as_bit(uc))
 	{
-	  t_mem m;
 	  mem= params[0]->value.bit.mem;
-	  m= mem->read(params[0]->value.bit.mem_address);
-	  char *sn=
-	    uc->symbolic_bit_name((t_addr)-1,
-				  mem,
-				  params[0]->value.bit.mem_address,
-				  params[0]->value.bit.mask);
-	  con->dd_printf("%10s ", sn?sn:"");
-	  con->dd_printf(mem->addr_format, params[0]->value.bit.mem_address);
-	  con->dd_printf(" ");
-	  con->dd_printf(mem->data_format, m);
-	  con->dd_printf(" %c\n", (m&(params[0]->value.bit.mask))?'1':'0');
+          con->dd_printf((mem ? mem->addr_format : "0x%06lx"), params[0]->value.bit.mem_address);
+	  t_mem m= mem->get(params[0]->value.bit.mem_address);
+          int bitnr_low= params[0]->value.bit.bitnr_low;
+          if (bitnr_low >= 0)
+            {
+              int bitnr_high= params[0]->value.bit.bitnr_high;
+              if (bitnr_high >= 0 && bitnr_high != bitnr_low)
+                {
+                  con->dd_printf("[%u:%u] 0b", bitnr_high, bitnr_low);
+	          for (int i= bitnr_high; i >= bitnr_low; i--)
+                    con->dd_printf("%c", (m & (1U << i)) ? '1' : '0');
+		  con->dd_printf("\n");
+                }
+              else
+                con->dd_printf(".%u %c\n", bitnr_low, (m & (1U << bitnr_low)) ? '1' : '0');
+            }
+	  else
+            {
+	      con->dd_printf(" ");
+	      con->dd_printf(mem->data_format, m);
+	      con->dd_printf("\n");
+            }
 	  i++;
 	  params[0]= cmdline->param(i);
 	}
@@ -658,25 +668,41 @@ CMDHELP(cl_Where_cmd,
 
 COMMAND_DO_WORK_UC(cl_var_cmd)
 {
-  class cl_cmd_arg *params[4]= { cmdline->param(0),
+  class cl_cmd_arg *params[5]= { cmdline->param(0),
 				 cmdline->param(1),
 				 cmdline->param(2),
-				 cmdline->param(3) };
+				 cmdline->param(3),
+				 cmdline->param(4) };
   class cl_memory *m= NULL;
   t_addr addr= -1;
-  int bit= -1;
+  int bitnr_low= -1;
+  int bitnr_high= -1;
   class cl_var *v;
   
-  if (cmdline->syntax_match(uc, STRING MEMORY ADDRESS NUMBER))
+  if (cmdline->syntax_match(uc, STRING MEMORY ADDRESS NUMBER NUMBER))
     {
       m= params[1]->value.memory.memory;
       addr= params[2]->value.address;
-      bit= params[3]->value.number;
+      bitnr_low= bitnr_high= params[3]->value.number;
+      bitnr_high= params[4]->value.number;
+    }
+  else if (cmdline->syntax_match(uc, STRING MEMORY ADDRESS NUMBER))
+    {
+      m= params[1]->value.memory.memory;
+      addr= params[2]->value.address;
+      bitnr_low= bitnr_high= params[3]->value.number;
     }
   else if (cmdline->syntax_match(uc, STRING MEMORY ADDRESS))
     {
       m= params[1]->value.memory.memory;
       addr= params[2]->value.address;
+    }
+  else if (cmdline->syntax_match(uc, STRING BIT))
+    {
+      m= params[1]->value.bit.mem;
+      addr= params[1]->value.bit.mem_address;
+      bitnr_low= params[1]->value.bit.bitnr_low;
+      bitnr_high= params[1]->value.bit.bitnr_high;
     }
   else if (cmdline->syntax_match(uc, STRING CELL))
     {
@@ -691,10 +717,6 @@ COMMAND_DO_WORK_UC(cl_var_cmd)
   if (!valid_sym_name(params[0]->value.string.string))
     return con->dd_printf("name is invalid\n"),
       false;
-  if ((bit >= 0) &&
-      (bit >= (int)sizeof(t_mem)*8))
-    return con->dd_printf("max bit number is %d\n", (int)sizeof(t_mem)*8),
-      false;
   
   if (m)
     if (!m->is_address_space())
@@ -704,10 +726,10 @@ COMMAND_DO_WORK_UC(cl_var_cmd)
     if (!m->valid_address(addr))
       return con->dd_printf("invalid address\n"),
 	false;
-  if (bit >= 0)
-    if (bit >= 32)
-      return con->dd_printf("invalid bit number\n"),
-	false;
+  if (bitnr_low >= (int)sizeof(t_mem)*8 ||
+      bitnr_high >= (int)sizeof(t_mem)*8)
+    return con->dd_printf("max bit number is %d\n", (int)sizeof(t_mem)*8),
+      false;
 
   if (uc->symbol2address(params[0]->value.string.string,
 			 (class cl_address_space **)NULL,
@@ -718,13 +740,13 @@ COMMAND_DO_WORK_UC(cl_var_cmd)
   if (m)
     {
       v= new cl_var(params[0]->value.string.string,
-		    (cl_address_space*)m, addr, chars(""), bit);
+		    (cl_address_space*)m, addr, chars(""), bitnr_high, bitnr_low);
       v->init();
       uc->vars->add(v);
     }
   else
     {
-      if (bit < 0)
+      if (bitnr_low < 0)
 	{
 	  if (addr < 0)
 	    {
@@ -736,7 +758,7 @@ COMMAND_DO_WORK_UC(cl_var_cmd)
 	    return con->dd_printf("out of range\n"),
 	      false;
 	  v= new cl_var(params[0]->value.string.string,
-			uc->variables, addr, chars(""), bit);
+			uc->variables, addr, chars(""), bitnr_high, bitnr_low);
 	  v->init();
 	  uc->vars->add(v);
 	}

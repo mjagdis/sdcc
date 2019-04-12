@@ -115,7 +115,6 @@ COMMAND_DO_WORK_UC(cl_set_bit_cmd)
 {
   class cl_memory *mem;
   t_addr mem_addr= 0;
-  t_mem bit_mask= 0;
   class cl_cmd_arg *params[4]= { cmdline->param(0),
 				 cmdline->param(1),
 				 cmdline->param(2),
@@ -124,12 +123,29 @@ COMMAND_DO_WORK_UC(cl_set_bit_cmd)
   if (cmdline->syntax_match(uc, BIT NUMBER)) {
     mem= params[0]->value.bit.mem;
     mem_addr= params[0]->value.bit.mem_address;
-    bit_mask= params[0]->value.bit.mask;
-    if (params[1]->value.number)
-      mem->set_bit1(mem_addr, bit_mask);
+    if (params[0]->value.bit.bitnr_low >= 0)
+      {
+        t_mem mask= 0;
+        for (int i= params[1]->value.bit.bitnr_low; i <= params[0]->value.bit.bitnr_high; mask |= 1U << i++);
+        mem->set(mem_addr, (mem->get(mem_addr) & (~mask)) | ((params[1]->value.number << params[0]->value.bit.bitnr_low) & mask));
+      }
     else
-      mem->set_bit0(mem_addr, bit_mask);
-    mem->dump(mem_addr, mem_addr, 1, con->get_fout());
+        mem->set(mem_addr, params[1]->value.number);
+
+    con->dd_printf("%s[", mem->get_name("?"));
+    con->dd_printf(mem->addr_format, mem_addr);
+    t_mem m= mem->get(mem_addr);
+    int bitnr_low= params[0]->value.bit.bitnr_low;
+    int bitnr_high= params[0]->value.bit.bitnr_high;
+    if (bitnr_high >= 0 && bitnr_high != bitnr_low)
+      {
+        con->dd_printf("][%u:%u] 0b", bitnr_high, bitnr_low);
+        for (int i= bitnr_high; i >= bitnr_low; i--)
+          con->dd_printf("%c", (m & (1U << i)) ? '1' : '0');
+        con->dd_printf("\n");
+      }
+    else
+      con->dd_printf("].%u %c\n", bitnr_low, (m & (1U << bitnr_low)) ? '1' : '0');
   }
   else
     syntax_error(con);

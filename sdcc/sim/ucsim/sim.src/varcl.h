@@ -43,12 +43,12 @@ class cl_var: public cl_base
  public:
   class cl_address_space *as; // reference
   t_addr addr;
-  int bitnr;
+  int bitnr_high, bitnr_low;
   chars desc;
  protected:
   class cl_memory_cell *cell;
  public:
-  cl_var(const char *iname, class cl_address_space *ias, t_addr iaddr, chars adesc, int ibitnr= -1);
+  cl_var(const char *iname, class cl_address_space *ias, t_addr iaddr, chars adesc, int ibitnr_high= -1, int ibitnr_low= -1);
   virtual int init(void);
   virtual class cl_memory_cell *get_cell(void) { return cell; }
   
@@ -63,6 +63,7 @@ class cl_var_list: public cl_sorted_list
  public:
   virtual void *key_of(void *item);
   virtual int compare(void *key1, void *key2);
+  virtual const char *cell_name(class cl_memory_cell *cell, int bitnr_high, int bitnr_low);
 };
 
 

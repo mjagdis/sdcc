@@ -352,19 +352,17 @@ public:
   virtual bool symbol2address(char *sym,
 			      class cl_address_space **as,
 			      t_addr *addr);
-  virtual char *symbolic_bit_name(t_addr bit_address,
-				  class cl_memory *mem,
-				  t_addr mem_addr,
-				  t_mem bit_mask);
   virtual name_entry *get_name_entry(struct name_entry tabl[],
 				     char *name);
-  virtual chars cell_name(class cl_memory_cell *cell);
+  virtual chars cell_name(class cl_memory_cell *cell) { return vars->cell_name(cell, -1, -1); }
+  virtual chars cell_name(class cl_memory_cell *cell, int bitnr_low, int bitnr_high);
   virtual class cl_var *var(char *nam);
   
   /* Converting abstract address spaces into real ones */
   virtual class cl_address_space *bit2mem(t_addr bitaddr,
 					  t_addr *memaddr,
-					  t_mem *bitmask);
+					  int *bitnr_high,
+					  int *bitnr_low);
   virtual t_addr bit_address(class cl_memory *mem,
                              t_addr mem_address,
                              int bit_number) { return(-1); }

@@ -630,6 +630,7 @@ cl_uc::build_cmdset(class cl_cmdset *cmdset)
     cset->add(cmd= new cl_set_mem_cmd("memory", 0));
     cmd->init();
     cset->add(cmd= new cl_set_bit_cmd("bit", 0));
+    cmd->add_name("bits");
     cmd->init();
     cset->add(cmd= new cl_set_hw_cmd("hardware", 0));
     cmd->add_name("hw");
@@ -1656,7 +1657,8 @@ cl_uc::addr_name(t_addr addr, class cl_address_space *as, char *buf)
     {
       class cl_var *v= (cl_var *)(vars->at(i));
       if ((v->as == as) &&
-	  (v->addr == addr))
+	  (v->addr == addr) &&
+	  (v->bitnr_low < 0))
 	{
 	  strcpy(buf, v->get_name());
 	  return true;
@@ -1677,7 +1679,9 @@ cl_uc::addr_name(t_addr addr, class cl_address_space *as, int bitnr, char *buf)
       class cl_var *v= (cl_var *)(vars->at(i));
       if ((v->as == as) &&
 	  (v->addr == addr) &&
-	  (v->bitnr == bitnr))
+	  (v->bitnr_low == bitnr) &&
+	  ((v->bitnr_high == bitnr) ||
+	   (v->bitnr_high < 0)))
 	{
 	  strcpy(buf, v->get_name());
 	  return true;
@@ -1702,7 +1706,7 @@ cl_uc::symbol2address(char *sym,
   if (vars->search(sym, i))
     {
       v= (class cl_var *)(vars->at(i));
-      if (v->bitnr >= 0)
+      if (v->bitnr_low >= 0)
 	return false;
       if (as)
 	*as= v->as;
@@ -1713,37 +1717,6 @@ cl_uc::symbol2address(char *sym,
   return false;
 }
   
-char *
-cl_uc::symbolic_bit_name(t_addr bit_address,
-			 class cl_memory *mem,
-			 t_addr mem_addr,
-			 t_mem bit_mask)
-{
-  //char *sym_name= 0;
-  int i;
-  chars c= chars("", mem?(mem->addr_format):"0x%06lx", (unsigned long)mem_addr);
-  /*if (!sym_name)
-    {
-      sym_name= (char *)malloc(16);
-      sprintf(sym_name, mem?(mem->addr_format):"0x%06lx", (unsigned long)mem_addr);
-      }*/
-  /*sym_name= (char *)realloc(sym_name, strlen(sym_name)+2);
-    strcat(sym_name, ".");*/
-  c+= cchars(".");
-  i= 0;
-  while (bit_mask > 1)
-    {
-      bit_mask>>=1;
-      i++;
-    }
-  //char bitnumstr[10];
-  /*sprintf(bitnumstr, "%1d", i);
-    strcat(sym_name, bitnumstr);*/
-  c.append("%d", i);
-  return(/*sym_name*/strdup((char*)c));
-}
-
-
 /*
  * Searching for a name in the specified table
  */
@@ -1773,27 +1746,30 @@ cl_uc::get_name_entry(struct name_entry tabl[], char *name)
 }
 
 chars
-cl_uc::cell_name(class cl_memory_cell *cell)
+cl_uc::cell_name(class cl_memory_cell *cell, int bitnr_low, int bitnr_high)
 {
+  const char *s;
   if (cell == NULL)
     return chars("");
-  if (cell->get_flag(CELL_VAR))
+  if ((s= vars->cell_name(cell, bitnr_low, bitnr_high)))
+    return chars(s);
+  if (bitnr_low != -1 && (s= vars->cell_name(cell, -1, -1)))
     {
-      int i;
-      for (i= 0; i < vars->count; i++)
-	{
-	  class cl_var *v= (cl_var*)(vars->at(i));
-	  if (v->get_cell() &&
-	      (cell == v->get_cell()))
-	    return chars(v->get_name());
-	}
+      if (bitnr_high != bitnr_low)
+        return chars("", "%s[%d:%d]", s, bitnr_high, bitnr_low);
+      else
+        return chars("", "%s.%d", s, bitnr_low);
     }
-  class cl_address_space *as;
   t_addr a;
-  as= address_space(cell, &a);
+  class cl_address_space *as= address_space(cell, &a);
   if (as == NULL)
     return chars("");
-  return chars("", "%s_%06x", as->get_name(), a);
+  if (bitnr_low == -1)
+    return chars("", "%s_%06x", as->get_name(), a);
+  else if (bitnr_high != bitnr_low)
+    return chars("", "%s_%06x[%d:%d]", as->get_name(), a, bitnr_high, bitnr_low);
+  else
+    return chars("", "%s_%06x.%d", as->get_name(), a, bitnr_low);
 }
 
 class cl_var *
@@ -1925,13 +1901,12 @@ cl_uc::check_errors(void)
  */
 
 class cl_address_space *
-cl_uc::bit2mem(t_addr bitaddr, t_addr *memaddr, t_mem *bitmask)
+cl_uc::bit2mem(t_addr bitaddr, t_addr *memaddr, int *bitnr_high, int *bitnr_low)
 {
   if (memaddr)
     *memaddr= bitaddr;
-  if (bitmask)
-    *bitmask= 1 << (bitaddr & 0x7);
-  return(0); // abstract...
+
+  return rom;
 }
 
 
