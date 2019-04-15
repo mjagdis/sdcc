@@ -116,6 +116,7 @@ cl_stm8::reset(void)
   regs.Y = 0;
   regs.CC = 0x28;
   //regs.VECTOR = 1;
+  cfg_gcr->set(0);
   PC= 0x8000;
 }
 
@@ -742,7 +743,6 @@ cl_stm8::make_memories(void)
 
   regs16= new cl_address_space("regs16", 0, 3, 16);
   regs16->init();
-
   regs16->get_cell(0)->decode((t_mem*)&regs.X);
   regs16->get_cell(1)->decode((t_mem*)&regs.Y);
   regs16->get_cell(2)->decode((t_mem*)&regs.SP);
@@ -761,6 +761,14 @@ cl_stm8::make_memories(void)
   vars->add(v= new cl_var(cchars("Y"), regs16, 1, "", 15, 0));
   v->init();
   vars->add(v= new cl_var(cchars("SP"), regs16, 2, "", 15, 0));
+  v->init();
+
+  cfg_gcr= rom->get_cell(0x7f60);
+  vars->add(v= new cl_var(cchars("CFG_GCR"), rom, 0x7f60, "", 7, 0));
+  v->init();
+  vars->add(v= new cl_var(cchars("CFG_GCR_AL"), rom, 0x7f60, "", 1, 1));
+  v->init();
+  vars->add(v= new cl_var(cchars("CFG_GCR_SWD"), rom, 0x7f60, "", 0, 0));
   v->init();
 }
 

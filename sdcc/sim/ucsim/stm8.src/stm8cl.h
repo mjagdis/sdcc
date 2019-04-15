@@ -42,6 +42,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 class cl_stm8: public cl_uc
 {
 private:
+  class cl_memory_cell *cfg_gcr;
   unsigned int func_index;
   unsigned int label_index;
   unsigned int loop_index;
