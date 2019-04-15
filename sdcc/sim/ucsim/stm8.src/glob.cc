@@ -139,7 +139,7 @@ struct dis_entry disass_stm8[]= {
   { 0x0041, 0x00ff, ' ', 1, "exg A,XL" },
   { 0x0051, 0x00ff, ' ', 1, "exgw X,Y" },
   { 0x0061, 0x00ff, ' ', 1, "exg A,YL" },
-  { 0x008e, 0x00ff, ' ', 1, "halt" },
+  { 0x008e, 0x00ff, ' ', 1, "halt", true },
   { 0x0082, 0x00ff, '@', 4, "int %e" },
 
   { 0x000c, 0x00ff, ' ', 2, "inc (%1,SP)" },
@@ -326,7 +326,7 @@ struct dis_entry disass_stm8[]= {
   { 0x005d, 0x00ff, ' ', 1, "tnzw X" },
 
   { 0x0083, 0x00ff, ' ', 1, "trap", true },
-  { 0x008f, 0x00ff, ' ', 1, "wfi" },
+  { 0x008f, 0x00ff, ' ', 1, "wfi", true },
 
   { 0x0018, 0x00ff, ' ', 2, "xor A,(%1,SP)" },
   { 0x00a8, 0x00ff, ' ', 2, "xor A,%b" },
@@ -343,7 +343,7 @@ struct dis_entry disass_stm8[]= {
 
 
 struct dis_entry disass_stm8_71[]= {
-  { 0x00ec, 0x00ff, '!', 1, "halt" },
+  { 0x00ec, 0x00ff, '!', 1, "halt", true },
   { 0x00ed, 0x00ff, ' ', 1, "putchar" },
   
   { 0, 0, 0, 0, NULL }
@@ -494,7 +494,7 @@ struct dis_entry disass_stm8_72[]= {
   { 0x005d, 0x00ff, ' ', 3, "tnz %x" },
   { 0x006d, 0x00ff, ' ', 3, "tnz ([%2.w],X)" },
 
-  { 0x008f, 0x00ff, ' ', 1, "wfe" },
+  { 0x008f, 0x00ff, ' ', 1, "wfe", true },
 
   { 0x00c8, 0x00ff, ' ', 3, "xor A,[%2.w]" },
   { 0x00d8, 0x00ff, ' ', 3, "xor A,([%2.w],X)" },

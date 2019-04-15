@@ -42,6 +42,7 @@ class cl_itc: public cl_hw
   class cl_memory_cell *exti_cr1, *exti_cr2, *exti_cr3, *exti_cr4;
   class cl_memory_cell *exti_sr1, *exti_sr2;
   class cl_memory_cell *exti_conf1, *exti_conf2;
+  class cl_memory_cell *wfe_cr1, *wfe_cr2, *wfe_cr3, *wfe_cr4;
  public:
   cl_itc(class cl_uc *auc);
   virtual int init(void);
@@ -57,6 +58,32 @@ class cl_itc: public cl_hw
   virtual void happen(class cl_hw *where, enum hw_event he, void *params);
 
   virtual void print_info(class cl_console_base *con);
+};
+
+class cl_stm8_it_src: public cl_it_src
+{
+ private:
+  class cl_stm8 *stm8;
+  class cl_memory_cell *wfe_cell;
+public:
+  t_mem  wfe_mask; // Mask of bit in WFE_CR<n>
+
+  cl_stm8_it_src(cl_uc  *Iuc,
+            int    Inuof,
+            class  cl_memory_cell *Iie_cell,
+            t_mem  Iie_mask,
+            class  cl_memory_cell *Isrc_cell,
+            t_mem  Isrc_mask,
+            class  cl_memory_cell *Iwfe_cell,
+            t_mem  Iwfe_mask,
+            t_addr Iaddr,
+            bool   Iclr_bit,
+            bool   Iindirect,
+            const  char *Iname,
+            int    apoll_priority);
+  virtual ~cl_stm8_it_src(void) {}
+
+  virtual bool pending(void);
 };
 
 

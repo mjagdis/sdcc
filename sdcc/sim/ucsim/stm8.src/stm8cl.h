@@ -64,6 +64,10 @@ public:
   class cl_itc *itc;
   class cl_it_src *trap_src;
   class cl_flash *flash_ctrl;
+  bool wakeup;
+private:
+  void context_save(void);
+  void context_restore(void);
 public:
   cl_stm8(struct cpu_entry *IType, class cl_sim *asim);
   virtual int init(void);
