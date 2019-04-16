@@ -80,9 +80,17 @@ cl_ticker::cl_ticker(const char *aname, bool artime, double afreq, int adir, enu
 cl_ticker::~cl_ticker(void) {}
 
 void
-cl_ticker::tick(int nr)
+cl_ticker::tick(class cl_uc *uc, int nr, int count)
 {
-  ticks+= dir * nr;
+  long old_ticks = ticks;
+
+  ticks += dir * count;
+
+  if (old_ticks > 0 && ticks <= 0)
+    {
+      class cl_error_timer_expired *e= new cl_error_timer_expired(uc, nr);
+      uc->error(e);
+    }
 }
 
 double
@@ -1921,7 +1929,7 @@ cl_uc::check_errors(void)
 		con= c->frozen_console;
 	      if (con)
 		{
-		  con->dd_printf("Erronouse instruction: ");
+		  con->dd_printf("At instruction: ");
 		  print_disass(error->PC, con);
 		}
 	    }
@@ -1982,7 +1990,7 @@ cl_uc::tick(int cycles)
   if (state != stPD)
     inst_ticks+= cycles;
 
-  ticks->tick(cycles * clock_per_cycle() * ticks->freq / xtal);
+  ticks->tick(this, 0, cycles * clock_per_cycle() * ticks->freq / xtal);
   update_tickers(true, ticks->freq, cycles * clock_per_cycle() * ticks->freq / xtal);
 
   if (state == stGO)
@@ -2012,7 +2020,7 @@ cl_uc::update_tickers(bool rtime, double freq, int cycles)
               ((!t->inisr && il->level < 0) ||
                (t->inisr && il->level >= 0))))))
         {
-          t->tick(cycles);
+          t->tick(this, i, cycles);
           if (t->state != stUNDEF)
             tickers_updated++;
         }
@@ -2022,7 +2030,7 @@ cl_uc::update_tickers(bool rtime, double freq, int cycles)
     {
       class cl_ticker *ticker = new cl_ticker(NULL, rtime, freq, +1, state, (il->level >= 0));
       add_counter(ticker, ticker->get_name());
-      ticker->tick(cycles);
+      ticker->tick(this, counters->count, cycles);
     }
 
   return(0);
@@ -2602,6 +2610,32 @@ cl_uc::stop_when(class cl_time_measurer *t)
  *----------------------------------------------------------------------------
  */
 
+cl_error_timer_expired::cl_error_timer_expired(class cl_uc *auc, int anr)
+{
+  uc= auc;
+  nr= anr;
+  classification= uc_error_registry.find("timer_expired");
+}
+
+void
+cl_error_timer_expired::print(class cl_commander_base *c)
+{
+  class cl_ticker *ticker;
+  const char *name;
+
+  c->dd_printf("%s: timer ", get_type_name());
+
+  if (nr < uc->counters->count &&
+      (ticker = (class cl_ticker *)(uc->counters->at(nr))) &&
+      (name = ticker->get_name()) &&
+      name[0])
+    c->dd_printf("%s", name);
+  else
+    c->dd_printf("%d", nr);
+
+  c->dd_printf(" has expired\n");
+}
+
 cl_error_unknown_code::cl_error_unknown_code(class cl_uc *the_uc)
 {
   uc= the_uc;
@@ -2629,7 +2663,8 @@ cl_error_unknown_code::print(class cl_commander_base *c)
 cl_uc_error_registry::cl_uc_error_registry(void)
 {
   class cl_error_class *prev = uc_error_registry.find("non-classified");
-  prev = register_error(new cl_error_class(err_error, "unknown_code", prev, ERROR_OFF));
+  register_error(new cl_error_class(err_error, "unknown_code", prev, ERROR_OFF));
+  register_error(new cl_error_class(err_warning, "timer_expired", prev, ERROR_ON));
 }
 
 /* End of uc.cc */

@@ -61,7 +61,7 @@ public:
   cl_ticker(const char *aname, bool artime, double afreq, int adir = +1, enum cpu_state astate = stGO, bool ainisr = false);
   virtual ~cl_ticker(void);
 
-  virtual void tick(int nr);
+  virtual void tick(class cl_uc *uc, int nr, int count);
   virtual double get_rtime(void);
   virtual void dump(class cl_uc *uc, int nr, class cl_console_base *con);
 };
@@ -399,6 +399,17 @@ public:
  */
 
 #include "errorcl.h"
+
+class cl_error_timer_expired: public cl_error
+{
+ protected:
+  class cl_uc *uc;
+  int nr;
+ public:
+  cl_error_timer_expired(class cl_uc *auc, int anr);
+
+  virtual void print(class cl_commander_base *c);
+};
 
 class cl_error_unknown_code: public cl_error
 {
