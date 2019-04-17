@@ -42,7 +42,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 class cl_stm8: public cl_uc
 {
 private:
-  class cl_memory_cell *cfg_gcr;
   unsigned int func_index;
   unsigned int label_index;
   unsigned int loop_index;
@@ -60,6 +59,8 @@ public:
     *flash_chip; // max 128k
   //class cl_memory *rom;
   struct t_regs regs;
+  class cl_memory_cell *cfg_gcr;
+  t_mem cfg_gcr_last_disable;
   class cl_clk *clk;
   class cl_itc *itc;
   class cl_it_src *trap_src;
