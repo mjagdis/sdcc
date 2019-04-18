@@ -779,8 +779,20 @@ cl_stm8::inst_jr(t_mem code, unsigned char prefix)
       case 6: // JRNM (2C) / JRM (2D)
         taken = !(regs.CC & (BIT_I1|BIT_I0));
         break;
-      case 7: // JRIL (2E) / JRIH (2F), no means to test this ???
-        taken = 0;
+      case 7: // JRIL (2E) / JRIH (2F)
+        if (type->type == CPU_STM8SAF)
+          {
+            static bool notified = false;
+            if (!notified)
+              {
+                notified = true;
+                error(new cl_errata("JRIL and JRIH instructions are not available."));
+              }
+            taken = (code == 0x2e);
+          }
+	else
+          taken = (code == 0x2f && irq);
+        break;
       default:
         return(resHALT);
     }
