@@ -763,20 +763,18 @@ cl_stm8::make_memories(void)
   ad->init();
   as->decoders->add(ad);
   ad->activate(0);
-  class cl_option *o= application->options->get_option("writable_flash");
-  bool wv= false;
-  if (o)
-    o->get_value(&wv);
-  if (!wv)
-    rom->set_cell_flag(0x8000, 0x27fff, true, CELL_READ_ONLY);
-  
+
   regs8= new cl_address_space("regs8", 0, 2, 8);
   regs8->init();
+  regs8->decode(0, (new cl_memory_chip("regs8", 2, 8))->chip_init());
+
   regs8->get_cell(0)->decode((t_mem*)&regs.A);
   regs8->get_cell(1)->decode((t_mem*)&regs.CC);
 
   regs16= new cl_address_space("regs16", 0, 3, 16);
   regs16->init();
+  regs16->decode(0, (new cl_memory_chip("regs16", 3, 16))->chip_init());
+
   regs16->get_cell(0)->decode((t_mem*)&regs.X);
   regs16->get_cell(1)->decode((t_mem*)&regs.Y);
   regs16->get_cell(2)->decode((t_mem*)&regs.SP);

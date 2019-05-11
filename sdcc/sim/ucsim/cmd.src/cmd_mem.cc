@@ -458,52 +458,56 @@ COMMAND_DO_WORK_UC(cl_memory_cell_cmd)
 				 cmdline->param(1) };
   class cl_memory *m= 0;
   t_addr a= 0;
-  class cl_address_space *as= 0;
-  class cl_memory_cell *c= 0;
 
-  if (cmdline->syntax_match(uc, CELL))
+  if (cmdline->syntax_match(uc, BIT))
     {
-      c= params[0]->value.cell;
-      m= as= uc->address_space(c, &a);
+      m= params[0]->value.bit.mem;
+      a= params[0]->value.bit.mem_address;
     }
   else if (cmdline->syntax_match(uc, MEMORY ADDRESS /*NUMBER*/))
     {
       m= params[0]->value.memory.memory;
       a= params[1]->value.number;
-      if (m->is_address_space())
-	as= (cl_address_space *)m;
     }
-  if (m == 0)
+  else
     return syntax_error(con), false;
 
-  if (!c)
-    c= as->get_cell(a);
-  con->dd_printf("%s", as->get_name());
+  con->dd_printf("%s", m->get_name());
   con->dd_printf("[");
-  con->dd_printf(as->addr_format, a);
-  con->dd_printf("] %s\n", (char*)uc->cell_name(c));
+  con->dd_printf(m->addr_format, a);
+  con->dd_printf("]\n");
 
-  con->dd_printf("cell data=%p/%d mask=%x flags=%x\n",
-		 c->get_data(),
-		 MU(c->get_width()),
-		 MU(c->get_mask()),
-		 MU(c->get_flags()));
-
-  int i;
-  for (i= 0; i < uc->memchips->count; i++)
+  class cl_memory_chip *chip = NULL;
+  if (m->is_address_space())
     {
-      cl_memory_chip *ch= (cl_memory_chip*)(uc->memchips->at(i));
-      t_addr ad;
-      if ((ad= ch->is_slot(c->get_data())) >= 0)
-	{
-	  con->dd_printf("  decoded to %s[%u]\n",
-			 ch->get_name(), AU(ad));
-	  break;
-	}
-    }
+      class cl_address_space *as = (cl_address_space *)m;
+      class cl_address_decoder *ad = as->get_decoder_of(a);
+      if (ad)
+        {
+          chip = ad->chip;
+          a = ad->as_to_chip(a);
 
-  con->dd_printf("Operators:\n");
-  c->print_operators(" ", con);
+          con->dd_printf("  decoded to %s", chip->get_name());
+          con->dd_printf("[");
+          con->dd_printf(chip->addr_format, a);
+          con->dd_printf("]\n");
+        }
+    }
+  else if (m->is_chip())
+    chip = (class cl_memory_chip *)m;
+
+  if (chip)
+    {
+      class cl_memory_cell *c = chip->get_cell(a);
+
+      con->dd_printf("cell width=%d mask=%x flags=%x\n",
+		     MU(chip->width),
+		     MU(c->get_mask()),
+		     MU(chip->get_flags(a)));
+
+      con->dd_printf("Operators:\n");
+      c->print_operators(" ", con);
+    }
   
   return false;
 }

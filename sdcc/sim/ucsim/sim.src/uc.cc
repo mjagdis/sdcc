@@ -536,33 +536,22 @@ cl_uc::make_memories(void)
 void
 cl_uc::make_variables(void)
 {
-  class cl_address_space *as;
   class cl_option *o= sim->app->options->get_option("var_size");
-  long l, i;
+  long l;
   
   if (o)
     o->get_value(&l);
   else
     l= 0x100;
 
-  class cl_address_decoder *ad;
-  class cl_memory_chip *chip;
-
   if (l > 0)
     {
-      variables= as= new cl_address_space("variables", 0, l, 32);
-      as->init();
-      address_spaces->add(as);
+      variables= new cl_address_space("variables", 0, l, 32);
+      variables->init();
+      address_spaces->add(variables);
+      variables->decode(0, (new cl_memory_chip("variables_storage", l, 32))->chip_init());
 
-      chip= new cl_memory_chip("variable_storage", l, 32);
-      chip->init();
-      memchips->add(chip);
-      ad= new cl_address_decoder(variables, chip, 0, l-1, 0);
-      ad->init();
-      variables->decoders->add(ad);
-      ad->activate(0);
-
-      for (i= 0; i < l; i++)
+      for (long i= 0; i < l; i++)
 	variables->set(i, 0);
     }
 }

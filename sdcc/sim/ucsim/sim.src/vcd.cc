@@ -108,7 +108,7 @@ cl_vcd::add_var(class cl_console_base *con, char id, class cl_memory_cell *cell,
   if (!cell)
     return;
 
-  if (cell->get_flag(CELL_NON_DECODED))
+  if (!cell->get_flag(CELL_DECODED))
     {
       if (con) con->dd_printf("Cell is not decoded\n");
       return;
@@ -121,7 +121,7 @@ cl_vcd::add_var(class cl_console_base *con, char id, class cl_memory_cell *cell,
     }
 
   if (bitnr_high == -1)
-    bitnr_high = cell->get_width() - 1;
+    bitnr_high = cell->chip->width - 1;
 
   if (bitnr_low == -1)
     bitnr_low = 0;
@@ -576,7 +576,7 @@ cl_vcd::set_cmd(class cl_cmdline *cmdline, class cl_console_base *con)
                         {
                           chars n= uc->cell_name((*ptr)->cell, (*ptr)->bitnr_low, (*ptr)->bitnr_high);
                           fprintf(fd, "$var wire %d %c %s $end\n",
-                                      ((*ptr)->bitnr_low >= 0 ? (*ptr)->bitnr_high - (*ptr)->bitnr_low + 1 : (*ptr)->cell->get_width()), 33 + i,
+                                      ((*ptr)->bitnr_low >= 0 ? (*ptr)->bitnr_high - (*ptr)->bitnr_low + 1 : (*ptr)->cell->chip->width), 33 + i,
                                       (char*)n);
                         }
                       fputs("$upscope $end\n$enddefinitions $end\n$dumpvars\n", fd);

@@ -87,6 +87,7 @@ cl_hw::init(void)
   cfg->init();
   cfg->hidden= true;
   uc->address_spaces->add(cfg);
+  cfg->decode(0, (new cl_memory_chip("cfg", cfg_size(), sizeof(t_mem)*8))->chip_init());
 
   for (i= 0; i < cfg_size(); i++)
     {
