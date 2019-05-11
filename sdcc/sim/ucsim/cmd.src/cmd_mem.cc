@@ -436,7 +436,7 @@ COMMAND_DO_WORK_UC(cl_memory_create_bank_cmd)
 	con->dd_printf("Specified area is not decoded by banker\n");
       else
 	{
-	  d->add_bank(bank, chip, chip_begin);
+	  d->add_bank(bank, (class cl_memory_chip *)chip, chip_begin);
 	}
     }
   return(false);

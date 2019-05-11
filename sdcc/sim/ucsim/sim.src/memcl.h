@@ -458,39 +458,30 @@ public:
 class cl_banker: public cl_address_decoder
 {
  protected:
-  class cl_address_space *banker_as, *banker2_as;
-  t_addr banker_addr, banker2_addr;
-  t_mem banker_mask, banker2_mask;
-  //int banker_shift;
-  int banker2_shift;
+  struct bank_def {
+    class cl_memory_chip *chip;
+    t_addr chip_begin;
+  };
+  struct bank_def *banks;
+  class cl_address_space *banker_as;
+  t_addr banker_addr;
+  t_mem banker_mask;
   int nuof_banks;
   int bank;
-  class cl_address_decoder **banks;
-  int shift_by, shift2_by;
+  int shift_by;
  public:
   cl_banker(class cl_address_space *the_banker_as,
 	    t_addr the_banker_addr,
 	    t_mem the_banker_mask,
-	    //int the_banker_shift,
 	    class cl_address_space *the_as,
 	    t_addr the_asb,
 	    t_addr the_ase);
-  cl_banker(class cl_address_space *the_banker_as,
-	    t_addr the_banker_addr,
-	    t_mem the_banker_mask,
-	    //int the_banker_shift,
-	    class cl_address_space *the_banker2_as,
-	    t_addr the_banker2_addr,
-	    t_mem the_banker2_mask,
-	    int the_banker2_shift,
-	    class cl_address_space *the_as,
-	    t_addr the_asb,
-	    t_addr the_ase);
+
   virtual ~cl_banker();
   virtual int init();
   virtual bool is_banker() { return true; }
 
-  virtual void add_bank(int bank_nr, class cl_memory *chip, t_addr chip_start);
+  virtual void add_bank(int bank_nr, class cl_memory_chip *chip, t_addr chip_begin);
 
   virtual t_mem actual_bank();
   virtual bool activate(class cl_console_base *con);

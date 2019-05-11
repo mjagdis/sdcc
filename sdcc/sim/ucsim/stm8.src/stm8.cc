@@ -683,7 +683,7 @@ cl_stm8::make_memories(void)
 {
   class cl_address_space *as;
 
-  rom= ram= as= new cl_flash_as/*address_space*/("rom", 0, 0x28000/*, 8*/);
+  rom= ram= as= new cl_address_space("rom", 0, 0x28000, 8);
   as->init();
   address_spaces->add(as);
 
@@ -719,7 +719,7 @@ cl_stm8::make_memories(void)
   cpu_chip= new cl_memory_chip("cpu_chip", 0x0100, 8);
   cpu_chip->init();
   memchips->add(cpu_chip);
-  flash_chip= new cl_memory_chip("flash_chip", 0x20000, 8, 0);
+  flash_chip= new cl_flash_memory_chip(this, "flash_chip", 0x20000, 8, 0);
   flash_chip->init();
   memchips->add(flash_chip);
   /*

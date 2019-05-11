@@ -2073,7 +2073,6 @@ cl_address_decoder::print_info(chars pre, class cl_console_base *con)
 cl_banker::cl_banker(class cl_address_space *the_banker_as,
 		     t_addr the_banker_addr,
 		     t_mem the_banker_mask,
-		     //int the_banker_shift,
 		     class cl_address_space *the_as,
 		     t_addr the_asb,
 		     t_addr the_ase):
@@ -2082,41 +2081,8 @@ cl_banker::cl_banker(class cl_address_space *the_banker_as,
   banker_as= the_banker_as;
   banker_addr= the_banker_addr;
   banker_mask= the_banker_mask;
-  //banker_shift= the_banker_shift;
-  banker2_as= NULL;
-  banker2_addr= 0;
-  banker2_mask= 0;
-  banker2_shift= 0;
   nuof_banks= 0;
   banks= 0;
-  //bank_ptrs= 0;
-  bank= -1;
-}
-
-cl_banker::cl_banker(class cl_address_space *the_banker_as,
-		     t_addr the_banker_addr,
-		     t_mem the_banker_mask,
-		     //int the_banker_shift,
-		     class cl_address_space *the_banker2_as,
-		     t_addr the_banker2_addr,
-		     t_mem the_banker2_mask,
-		     int the_banker2_shift,
-		     class cl_address_space *the_as,
-		     t_addr the_asb,
-		     t_addr the_ase):
-  cl_address_decoder(the_as, NULL, the_asb, the_ase, (t_addr)-1)
-{
-  banker_as= the_banker_as;
-  banker_addr= the_banker_addr;
-  banker_mask= the_banker_mask;
-  //banker_shift= the_banker_shift;
-  banker2_as= the_banker2_as;
-  banker2_addr= the_banker2_addr;
-  banker2_mask= the_banker2_mask;
-  banker2_shift= the_banker2_shift;
-  nuof_banks= 0;
-  banks= 0;
-  //bank_ptrs= 0;
   bank= -1;
 }
 
@@ -2124,10 +2090,9 @@ int
 cl_banker::init()
 {
   int m= banker_mask;
-  int b, b2;
+  int b;
 
   shift_by= 0;
-  shift2_by= 0;
   if (m == 0)
     nuof_banks= 0;
   else
@@ -2143,48 +2108,14 @@ cl_banker::init()
 	}
       nuof_banks= 1 << b;
     }
-  shift2_by= 0;
-  if (banker2_as &&
-      banker2_mask)
-    {
-      m= banker2_mask;
-      while ((m&1) == 0)
-	m>>=1, shift2_by++;
-      b2= 1;
-      m>>= 1;
-      while ((m&1) != 0)
-	m>>= 1, b2++;
-      if (b2)
-	nuof_banks*= (1 << b2);
-    }
-  if (nuof_banks > 0)
-    {
-      banks= (class cl_address_decoder **)malloc(nuof_banks * sizeof(class cl_address_decoder *));
-      //bank_ptrs= (t_mem **)calloc(nuof_banks*(as_end-as_begin+1), sizeof(t_mem *));
-      for (b= 0; b < nuof_banks; b++)
-	{
-	  banks[b]= NULL;
-	}
-    }
 
-  class cl_memory_cell *c= banker_as->get_cell(banker_addr);
-  if (c)
-    {
-      class cl_bank_switcher_operator *o=
-	new cl_bank_switcher_operator(c/*, banker_addr*/, this);
-      c->prepend_operator(o);
-    }
-  if (banker2_as &&
-      banker2_mask)
-    {
-      c= banker2_as->get_cell(banker2_addr);
-      if (c)
-	{
-	  class cl_bank_switcher_operator *o=
-	    new cl_bank_switcher_operator(c/*, banker_addr*/, this);
-	  c->prepend_operator(o);
-	}
-    }
+  if (nuof_banks > 0)
+    banks = new struct bank_def[nuof_banks];
+
+  class cl_memory_cell *cell= banker_as->get_cell(banker_addr);
+  if (cell)
+    cell->prepend_operator(new cl_bank_switcher_operator(cell, this));
+
   return 0;
 }
 
@@ -2195,16 +2126,15 @@ cl_banker::~cl_banker()
     {
       for (i= 0; i < nuof_banks; i++)
 	{
-	  if (banks[i])
-	    delete banks[i];
+	  if (banks[i].chip)
+	    delete banks[i].chip;
 	}
-      free(banks);
+      delete banks;
     }
-  //if (bank_ptrs) free(bank_ptrs);
 }
 
 void
-cl_banker::add_bank(int bank_nr, class cl_memory *chip, t_addr chip_start)
+cl_banker::add_bank(int bank_nr, class cl_memory_chip *chip, t_addr chip_begin)
 {
   if (!chip)
     return;
@@ -2216,93 +2146,37 @@ cl_banker::add_bank(int bank_nr, class cl_memory *chip, t_addr chip_start)
   if (bank_nr >= nuof_banks)
     return;
   
-  class cl_address_decoder *ad= new cl_address_decoder(address_space,
-						       chip,
-						       as_begin, as_end,
-						       chip_start);
-  ad->init();
-  if (banks[bank_nr])
-    {
-      delete banks[bank_nr];
-      banks[bank_nr]= 0;
-    }
-  banks[bank_nr]= ad;
-  /*
-  t_addr a, s, i;
-  s= as_end - as_begin + 1;
-  for (i= 0; i < s; i++)
-    {
-      a= chip_start + i;
-      //bank_ptrs[bank_nr*s + i]= ad->chip->get_slot(a);
-    }
-  */
+  banks[bank_nr].chip = chip;
+  banks[bank_nr].chip_begin = chip_begin;
+
   activate(0);
 }
 
 t_mem
 cl_banker::actual_bank()
 {
-  //t_mem m= banker_mask;
   t_mem v= banker_as->read(banker_addr) & banker_mask;
-  t_mem v2;
-  
-  v= (v >> shift_by);
-  if (banker2_as &&
-      banker2_mask)
-    {
-      v2= banker2_as->read(banker2_addr) & banker2_mask;
-      v2>>= shift2_by;
-      v2= v2 << banker2_shift;
-      v= v | v2;
-    }
-  return v;
+
+  return (v >> shift_by);
 }
 
 bool
 cl_banker::activate(class cl_console_base *con)
 {
-  int b= actual_bank();
-  t_addr i, s;
-  t_mem *data;
-  class cl_memory_cell *c;
-
-  if (b == bank)
-    return true;
-  if (banks[b] == NULL)
-    return true;
-  s= as_end - as_begin + 1;
-  for (i= 0; i < s; i++)
-    {
-      t_addr ca= banks[b]->chip_begin + i;
-      data= banks[b]->chip->get_slot(ca);
-      c= address_space->get_cell(as_begin+i);
-      c->decode(data);
-    }
-  bank= b;
-
+  switch_to(actual_bank(), con);
   return true;
 }
 
 bool
-cl_banker::switch_to(int bank_nr, class cl_console_base *con)
+cl_banker::switch_to(int b, class cl_console_base *con)
 {
-  int b= bank_nr;//actual_bank();
-  t_addr i, s;
-  t_mem *data;
-  class cl_memory_cell *c;
-
   if (b == bank)
     return true;
-  if (banks[b] == NULL)
+  if (banks[b].chip == NULL)
     return true;
-  s= as_end - as_begin + 1;
-  for (i= 0; i < s; i++)
-    {
-      t_addr ca= banks[b]->chip_begin + i;
-      data= banks[b]->chip->get_slot(ca);
-      c= address_space->get_cell(as_begin+i);
-      c->decode(data);
-    }
+
+  chip = banks[b].chip;
+  chip_begin = banks[b].chip_begin;
   bank= b;
 
   return true;
@@ -2335,25 +2209,18 @@ cl_banker::print_info(chars pre, class cl_console_base *con)
   con->dd_printf(pre);
   con->dd_printf("  banks:\n");
 
-  class cl_address_decoder *dc;
   int i;
   for (i= 0; i < nuof_banks; i++)
     {
-      dc= (class cl_address_decoder *)(banks[i]);
       con->dd_printf(pre);
       con->dd_printf("    %c %2d. ", (b==i)?'*':' ', i);
-      if (dc)
-	{
-	  if (dc->chip)
-	    {
-	      con->dd_printf("%s ", dc->chip->get_name("unknown"));
-	      con->dd_printf(dc->chip->addr_format, dc->chip_begin);
-	    }
-	  else
-	    con->dd_printf("x");
-	}
+      if (banks[i].chip)
+        {
+          con->dd_printf("%s ", banks[i].chip->get_name("unknown"));
+          con->dd_printf(banks[i].chip->addr_format, banks[i].chip_begin);
+        }
       else
-	con->dd_printf("-");
+        con->dd_printf("x");
       con->dd_printf("\n");
     }
 }
