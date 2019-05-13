@@ -2230,73 +2230,54 @@ cl_banker::print_info(chars pre, class cl_console_base *con)
  * Bit bander
  */
 
-cl_bander::cl_bander(class cl_address_space *the_as,
-		     t_addr the_asb,
-		     t_addr the_ase,
-		     class cl_memory *the_chip,
-		     t_addr the_cb,
-		     int the_bpc,
-		     int the_distance):
-  cl_address_decoder(the_as, the_chip, the_asb, the_ase, the_cb)
+cl_bander::cl_bander(const char *id, class cl_memory_chip *chip, t_addr chip_begin, int bpc, int distance):
+  cl_memory_chip(id, chip->get_size() * bpc, 1, (t_mem *)0)
 {
-  bpc= the_bpc;
-  distance= the_distance;
+  this->chip = chip;
+  this->chip_begin = chip_begin;
+  this->bpc = bpc;
+  this->distance = distance;
+
+  for (shift = 1; (1 << shift) < this->bpc; shift++);
+  shift--;
+
+  mask = 1 << shift;
 }
 
-bool
-cl_bander::activate(class cl_console_base *con)
+t_mem
+cl_bander::get(t_addr addr)
 {
-  address_space->undecode_area(this, as_begin, as_end, con);
+  addr = (addr >> shift) * distance + chip_begin;
+  return (chip->get(addr) >> (addr & mask)) & 1;
+}
 
-  t_addr asa, ca;
-  int b, m;
-  for (asa= as_begin, ca= chip_begin, b= 0, m= 1;
-       asa <= as_end;
-       asa++)
-    {
-      if (b >= bpc)
-	{
-	  ca+= distance;
-	  b= 0;
-	  m= 1;
-	}
-      t_mem *slot= chip->get_slot(ca);
-      cl_memory_cell *c= address_space->get_cell(asa);
-      c->decode(slot, m);
-      b++;
-      m<<= 1;
-    }
-  return activated= true;
+void
+cl_bander::set(t_addr addr, t_mem val)
+{
+  addr = (addr >> shift) * distance + chip_begin;
+  if (val)
+    chip->set(addr, chip->get(addr) | (1 << (addr & mask)));
+  else
+    chip->set(addr, chip->get(addr) & (~(1 << (addr & mask))));
 }
 
 void
 cl_bander::print_info(chars pre, class cl_console_base *con)
 {
-  if (address_space &&
-      address_space->hidden)
-    return;
-  if (chip &&
-      chip->hidden)
-    return;
-  con->dd_printf(pre);
-  if (address_space)
+  if (!hidden && chip && !chip->hidden)
     {
-      con->dd_printf("%s ", address_space->get_name("unknown"));
-      con->dd_printf(address_space->addr_format, as_begin);
-      con->dd_printf(" ");
-      con->dd_printf(address_space->addr_format, as_end);
-    }
-  else
-    con->dd_printf("x");
-  con->dd_printf(" -> bander(%d/%d) ", bpc, distance);
-  if (chip)
-    {
-      con->dd_printf("%s ", chip->get_name("unknown"));
+      con->dd_printf("%s0x%06x-0x%06x %8d %s (%d,%s,%s)"
+                     " -> bander(%d/%d) %s begin ",
+                     (char*)pre,
+                     AU(get_start_address()),
+                     AU(highest_valid_address()),
+                     AU(get_size()),
+                     get_name(),
+                     width, data_format, addr_format,
+                     bpc, distance, chip->get_name("unknown"));
       con->dd_printf(chip->addr_format, chip_begin);
+      con->dd_printf("\n");
     }
-  else
-    con->dd_printf("x");
-  con->dd_printf(" %s\n", (activated)?"activated":"inactive");
 }
 
 

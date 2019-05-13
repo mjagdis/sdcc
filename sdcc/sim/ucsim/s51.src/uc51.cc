@@ -916,10 +916,10 @@ cl_51core::decode_regs(void)
   b->init();
   b->set_name("def_regs_banker");
   regs->decoders->add(b);
-  b->add_bank(0, memory("iram_chip"), 0);
-  b->add_bank(1, memory("iram_chip"), 8);
-  b->add_bank(2, memory("iram_chip"), 16);
-  b->add_bank(3, memory("iram_chip"), 24);
+  b->add_bank(0, iram_chip, 0);
+  b->add_bank(1, iram_chip, 8);
+  b->add_bank(2, iram_chip, 16);
+  b->add_bank(3, iram_chip, 24);
   psw->write(0);
   for (i= 0; i < 8; i++)
     R[i]= regs->get_cell(i);
@@ -928,23 +928,17 @@ cl_51core::decode_regs(void)
 void
 cl_51core::decode_bits(void)
 {
-  class cl_address_decoder *ad;
+  class cl_memory_chip *chip;
   
-  ad= new cl_bander(bits, 0, 127,
-		    iram_chip, 32,
-		    8, 1);
-  ad->init();
-  ad->set_name("def_bits_bander_0-7f");
-  bits->decoders->add(ad);
-  ad->activate(0);
+  chip = new cl_bander("def_bits_bander_0-7f", iram_chip, 32, iram_chip->width, 1);
+  chip->init();
+  memchips->add(chip);
+  bits->decode(0x00, chip, 0, 128);
 
-  ad= new cl_bander(bits, 128, 255,
-		    sfr_chip, 0,
-		    8, 8);
-  ad->init();
-  ad->set_name("def_bits_bander_80-ff");
-  bits->decoders->add(ad);
-  ad->activate(0);
+  chip = new cl_bander("def_bits_bander_80-ff", sfr_chip, 0, sfr_chip->width, 8);
+  chip->init();
+  memchips->add(chip);
+  bits->decode(0x80, chip, 0, 128);
 }
 
 void
@@ -1012,16 +1006,16 @@ cl_51core::decode_dptr(void)
 				dptr, 0, 0);
 	  banker->init();
 	  dptr->decoders->add(banker);
-	  banker->add_bank(0, memory("sfr_chip"), DPL-0x80);
-	  banker->add_bank(1, memory("sfr_chip"), dpl1-0x80);
+	  banker->add_bank(0, sfr_chip, DPL-0x80);
+	  banker->add_bank(1, sfr_chip, dpl1-0x80);
 	  banker->activate(0);
 
 	  banker= new cl_banker(sfr, adps, mdps, //0,
 				dptr, 1, 1);
 	  banker->init();
 	  dptr->decoders->add(banker);
-	  banker->add_bank(0, memory("sfr_chip"), DPH-0x80);
-	  banker->add_bank(1, memory("sfr_chip"), dph1-0x80);
+	  banker->add_bank(0, sfr_chip, DPH-0x80);
+	  banker->add_bank(1, sfr_chip, dph1-0x80);
 	  banker->activate(0);
 
 	  sfr->write(adps, sfr->get(adps));

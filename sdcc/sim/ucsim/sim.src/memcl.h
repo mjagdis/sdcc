@@ -433,7 +433,6 @@ public:
   virtual ~cl_address_decoder(void);
   virtual int init(void);
   virtual bool is_banker() { return false; }
-  virtual bool is_bander() { return false; }
 
   virtual bool activate(class cl_console_base *con);
 
@@ -495,23 +494,23 @@ class cl_banker: public cl_address_decoder
  * Address decoder which maps to individual bits
  */
 
-class cl_bander: public cl_address_decoder
+class cl_bander: public cl_memory_chip
 {
+ private:
+  class cl_memory_chip *chip;
+  t_addr chip_begin;
+  int bpc;
+  int distance;
+  t_mem mask;
+  uchar shift;
+ public:
+  cl_bander(const char *id, class cl_memory_chip *chip, t_addr chip_begin, int bpc, int distance);
+  virtual ~cl_bander(void) {}
+  virtual class cl_bander *chip_init(void) { init(); return this; }
  protected:
-  int bpc; // bits_per_chip
-  int distance; // distance of next chip location
- public:
-  cl_bander(class cl_address_space *the_as,
-	    t_addr the_asb,
-	    t_addr the_ase,
-	    class cl_memory *the_chip,
-	    t_addr the_cb,
-	    int the_bpc,
-	    int the_distance);
- public:
-  virtual bool is_bander() { return true; }
+  virtual t_mem get(t_addr addr);
+  virtual void set(t_addr addr, t_mem val);
 
-  virtual bool activate(class cl_console_base *con);
   virtual void print_info(chars pre, class cl_console_base *con);
 };
 

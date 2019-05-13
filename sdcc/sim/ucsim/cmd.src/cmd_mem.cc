@@ -326,7 +326,7 @@ COMMAND_DO_WORK_UC(cl_memory_create_bander_cmd)
 				 cmdline->param(4),
 				 cmdline->param(5),
 				 cmdline->param(6) };
-  class cl_memory *as= 0;
+  class cl_memory *m= 0;
   t_addr asb= 0, ase= 0;
   class cl_memory *chip= 0;
   t_addr cb= 0;
@@ -334,7 +334,7 @@ COMMAND_DO_WORK_UC(cl_memory_create_bander_cmd)
 
   if (cmdline->syntax_match(uc, MEMORY NUMBER NUMBER MEMORY NUMBER NUMBER NUMBER))
     {
-      as= params[0]->value.memory.memory;
+      m= params[0]->value.memory.memory;
       asb= params[1]->value.number;
       ase= params[2]->value.number;
       chip= params[3]->value.memory.memory;
@@ -344,7 +344,7 @@ COMMAND_DO_WORK_UC(cl_memory_create_bander_cmd)
     }
   else if (cmdline->syntax_match(uc, MEMORY NUMBER NUMBER MEMORY NUMBER NUMBER))
     {
-      as= params[0]->value.memory.memory;
+      m= params[0]->value.memory.memory;
       asb= params[1]->value.number;
       ase= params[2]->value.number;
       chip= params[3]->value.memory.memory;
@@ -354,28 +354,23 @@ COMMAND_DO_WORK_UC(cl_memory_create_bander_cmd)
   else
     return syntax_error(con), false;
 
-  if (!as->is_address_space())
-    con->dd_printf("%s is not an address space\n", as->get_name("unknown"));
+  if (!m->is_address_space())
+    con->dd_printf("%s is not an address space\n", m->get_name("unknown"));
   else if (!chip->is_chip())
     con->dd_printf("%s is not a chip\n", chip->get_name("unknown"));
-  else if (asb < as->start_address ||
-           asb > as->highest_valid_address())
+  else if (asb < m->start_address ||
+           asb > m->highest_valid_address())
     con->dd_printf("Specified begin address is out of address space\n");
-  else if (ase < as->start_address ||
-           ase > as->highest_valid_address())
+  else if (ase < m->start_address ||
+           ase > m->highest_valid_address())
     con->dd_printf("Specified end address is out of address space\n");
   else if (cb < chip->start_address ||
            cb > chip->highest_valid_address())
     con->dd_printf("Specified chip address is out of size\n");
   else
     {
-      class cl_bander *b=
-	new cl_bander((class cl_address_space *)as, asb, ase,
-		      (class cl_memory_chip *)chip, cb,
-		      bpc, dist);
-      b->init();
-      ((class cl_address_space *)as)->decoders->add(b);
-      b->activate(con);
+      class cl_address_space *as = (cl_address_space *)m;
+      as->decode(asb, (new cl_bander("unnamed", (cl_memory_chip *)chip, cb, bpc, dist))->chip_init(), 0, ase - asb + 1);
     }
   return(false);
 }
