@@ -153,8 +153,6 @@ public:
   virtual t_mem read(void);
   virtual t_mem read(enum hw_cath skip) { return(read()); }
   virtual t_mem write(t_mem val);
-
-  virtual class cl_banker *get_banker(void) { return NULL; }
 };
 
 class cl_bank_switcher_operator: public cl_memory_operator
@@ -166,7 +164,6 @@ class cl_bank_switcher_operator: public cl_memory_operator
 			    class cl_banker *the_banker);
   
   virtual t_mem write(t_mem val);
-  virtual class cl_banker *get_banker(void) { return banker; }
 };
 
 class cl_hw_operator: public cl_memory_operator
@@ -251,8 +248,7 @@ class cl_memory_cell: public cl_abs_base
   
   virtual void decode(class cl_memory_chip *chip, t_addr addr) { this->chip = chip; this->chipaddr = addr; }
   virtual void decode(t_mem *data_ptr) {}
-  virtual void decode(t_mem *data_ptr, t_mem bit_mask);
-  
+
   virtual t_mem read(void);
   virtual t_mem read(enum hw_cath skip);
   virtual t_mem get(void);
@@ -274,11 +270,9 @@ class cl_memory_cell: public cl_abs_base
   virtual void prepend_operator(class cl_memory_operator *op);
   virtual void del_operator(class cl_brk *brk);
   virtual void del_operator(class cl_hw *hw);
-  virtual class cl_banker *get_banker(void);
-  
+
   virtual class cl_memory_cell *add_hw(class cl_hw *hw/*, t_addr addr*/);
   virtual void remove_hw(class cl_hw *hw);
-  virtual class cl_event_handler *get_event_handler(void);
 
   virtual void print_info(chars pre, class cl_console_base *con);
   virtual void print_operators(cchars pre, class cl_console_base *con);

@@ -1091,22 +1091,6 @@ cl_memory_cell::del_operator(class cl_hw *hw)
     }
 }
 
-class cl_banker *
-cl_memory_cell::get_banker(void)
-{
-  class cl_memory_operator *op= operators;
-  class cl_banker *b= NULL;
-
-  while (op)
-    {
-      b= op->get_banker();
-      if (b)
-	return b;
-      op= op->get_next();
-    }
-  return NULL;
-}
-
 class cl_memory_cell *
 cl_memory_cell::add_hw(class cl_hw *hw/*, t_addr addr*/)
 {
@@ -1126,12 +1110,6 @@ cl_memory_cell::get_hw(int ith)
 {
   return(0);
 }*/
-
-class cl_event_handler *
-cl_memory_cell::get_event_handler(void)
-{
-  return(0);
-}
 
 void
 cl_memory_cell::print_info(chars pre, class cl_console_base *con)
@@ -1179,15 +1157,13 @@ cl_dummy_cell::write(t_mem val)
 #ifdef STATISTIC
   nuof_writes++;
 #endif
-  *data= rand() & mask;
-  return(*data);
+  return rand() & mask;
 }
 
 t_mem
 cl_dummy_cell::set(t_mem val)
 {
-  *data= rand() & mask;
-  return(*data);
+  return rand() & mask;
 }
 
 
