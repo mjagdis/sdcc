@@ -35,11 +35,11 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 struct t_regs
 {
+  u16_t SP;
   u8_t A;
   u8_t P;
   u8_t H;
   u8_t X;
-  u16_t SP;
   u8_t VECTOR;
 };
 

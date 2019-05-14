@@ -766,33 +766,26 @@ cl_stm8::make_memories(void)
 
   regs8= new cl_address_space("regs8", 0, 2, 8);
   regs8->init();
-  regs8->decode(0, (new cl_memory_chip("regs8", 2, 8))->chip_init());
-
-  regs8->get_cell(0)->decode((t_mem*)&regs.A);
-  regs8->get_cell(1)->decode((t_mem*)&regs.CC);
+  regs8->decode(0, (new cl_chip_8bit("regs8", 2, (u8_t *)&regs.A))->chip_init());
 
   regs16= new cl_address_space("regs16", 0, 3, 16);
   regs16->init();
-  regs16->decode(0, (new cl_memory_chip("regs16", 3, 16))->chip_init());
-
-  regs16->get_cell(0)->decode((t_mem*)&regs.X);
-  regs16->get_cell(1)->decode((t_mem*)&regs.Y);
-  regs16->get_cell(2)->decode((t_mem*)&regs.SP);
+  regs16->decode(0, (new cl_chip_16bit("regs16", 3, (u16_t *)&regs.X))->chip_init());
 
   address_spaces->add(regs8);
   address_spaces->add(regs16);
 
   class cl_var *v;
-  vars->add(v= new cl_var(cchars("A"), regs8, 0, "", 7, 0));
+  vars->add(v= new cl_var(cchars("A"), regs8, (u8_t *)&regs.A - (u8_t *)&regs.A, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("CC"), regs8, 1, "", 7, 0));
+  vars->add(v= new cl_var(cchars("CC"), regs8, (u8_t *)&regs.CC - (u8_t *)&regs.A, "", 7, 0));
   v->init();
   
-  vars->add(v= new cl_var(cchars("X"), regs16, 0, "", 15, 0));
+  vars->add(v= new cl_var(cchars("X"), regs16, (u16_t *)&regs.X - (u16_t *)&regs.X, "", 15, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("Y"), regs16, 1, "", 15, 0));
+  vars->add(v= new cl_var(cchars("Y"), regs16, (u16_t *)&regs.Y - (u16_t *)&regs.X, "", 15, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("SP"), regs16, 2, "", 15, 0));
+  vars->add(v= new cl_var(cchars("SP"), regs16, (u16_t *)&regs.SP - (u16_t *)&regs.X, "", 15, 0));
   v->init();
 }
 
@@ -2524,12 +2517,7 @@ cl_stm8_cpu::cl_stm8_cpu(class cl_uc *auc):
 int
 cl_stm8_cpu::init(void)
 {
-  int i;
   cl_hw::init();
-  for (i= 0; i < 11; i++)
-    {
-      regs[i]= register_cell(uc->rom, 0x7f00+i);
-    }
 
   class cl_var *v;
   uc->vars->add(v= new cl_var(cchars("CFG_GCR"), uc->rom, 0x7f60, "", 7, 0));

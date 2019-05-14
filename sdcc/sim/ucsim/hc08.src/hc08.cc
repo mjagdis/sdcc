@@ -155,30 +155,26 @@ cl_hc08::make_memories(void)
 
   regs8= new cl_address_space("regs8", 0, 4, 8);
   regs8->init();
-  regs8->get_cell(0)->decode((t_mem*)&regs.A);
-  regs8->get_cell(1)->decode((t_mem*)&regs.P);
-  regs8->get_cell(2)->decode((t_mem*)&regs.H);
-  regs8->get_cell(3)->decode((t_mem*)&regs.X);
+  regs8->decode(0, (new cl_chip_8bit("regs8", 4, (u8_t *)&regs.A))->chip_init());
 
   regs16= new cl_address_space("regs16", 0, 1, 16);
   regs16->init();
-
-  regs16->get_cell(0)->decode((t_mem*)&regs.SP);
+  regs16->decode(0, (new cl_chip_16bit("regs16", 1, (u16_t *)&regs.SP))->chip_init());
 
   address_spaces->add(regs8);
   address_spaces->add(regs16);
 
   class cl_var *v;
-  vars->add(v= new cl_var(cchars("A"), regs8, 0, "", 7, 0));
+  vars->add(v= new cl_var(cchars("A"), regs8, (u8_t *)&regs.A - (u8_t *)&regs.A, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("P"), regs8, 1, "", 7, 0));
+  vars->add(v= new cl_var(cchars("P"), regs8, (u8_t *)&regs.P - (u8_t *)&regs.A, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("H"), regs8, 2, "", 7, 0));
+  vars->add(v= new cl_var(cchars("H"), regs8, (u8_t *)&regs.H - (u8_t *)&regs.A, "", 7, 0));
   v->init();
-  vars->add(v= new cl_var(cchars("X"), regs8, 3, "", 7, 0));
+  vars->add(v= new cl_var(cchars("X"), regs8, (u8_t *)&regs.X - (u8_t *)&regs.A, "", 7, 0));
   v->init();
 
-  vars->add(v= new cl_var(cchars("SP"), regs16, 0, "", 15, 0));
+  vars->add(v= new cl_var(cchars("SP"), regs16, (u16_t *)&regs.SP - (u16_t *)&regs.SP, "", 15, 0));
   v->init();
 }
 

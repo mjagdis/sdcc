@@ -35,12 +35,11 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 struct t_regs
 {
-  u8_t A;
   u16_t X;
   u16_t Y;
   u16_t SP;
+  u8_t A;
   u8_t CC;
-  //u8_t VECTOR;
 };
 
 #define BIT_C	0x01  // carry status(out of bit 7)

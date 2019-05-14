@@ -163,9 +163,7 @@ void cl_pdk::make_memories(void) {
 
   regs8 = new cl_address_space("regs8", 0, io_size + 1, 8);
   regs8->init();
-  for (size_t i = 0; i < io_size; ++i) {
-    regs8->get_cell(i)->decode((t_mem *)(regs.regs + i));
-  }
+  regs8->decode(0, (new cl_chip_8bit("regs8", sizeof(regs), (u8_t *)&regs))->chip_init());
   address_spaces->add(regs8);
 
   class cl_var *v;
