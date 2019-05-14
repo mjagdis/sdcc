@@ -105,13 +105,6 @@ cl_memory::init(void)
     c+= cchars("l");//strcat(data_format, "l");
   c+= cchars("x");//strcat(data_format, "x");
   data_format= strdup((char*)c);
-  data_mask= 1;
-  int w= width;
-  for (--w; w; w--)
-    {
-      data_mask<<= 1;
-      data_mask|= 1;
-    }
   dump_finished= start_address;
   return(0);
 }
@@ -846,16 +839,11 @@ cl_read_operator::read(void)
  *                                                                  Memory cell
  */
 
-cl_memory_cell::cl_memory_cell(class cl_memory_chip *chip, t_addr addr)//: cl_base()
+cl_memory_cell::cl_memory_cell(class cl_chip *chip, t_addr addr)//: cl_base()
 {
   this->chip= chip;
   this->chipaddr= addr;
 
-  data= chip->get_slot(addr);
-  if (!data)
-    data= &def_data;
-
-  def_data= 0;
   operators= NULL;
   //bank= 0;
   //banked_data_ptrs= 0;
@@ -878,7 +866,6 @@ cl_memory_cell::~cl_memory_cell(void)
 int
 cl_memory_cell::init(void)
 {
-  data= &def_data;
   return(0);
 }
 
@@ -1172,7 +1159,7 @@ cl_dummy_cell::set(t_mem val)
  */
 
 // Dummies are used so we can avoid a lot of null checks and simplify the code.
-class cl_memory_chip *cl_address_space::dummy_chip = (new cl_memory_chip("dummy", 1, 8))->chip_init();
+class cl_chip *cl_address_space::dummy_chip = (new cl_memory_chip("dummy", 1, 8))->chip_init();
 class cl_dummy_cell *cl_address_space::dummy = (new cl_dummy_cell(cl_address_space::dummy_chip, 0))->cell_init();
 
 cl_address_space::cl_address_space(const char *id, t_addr astart, t_addr asize, int awidth):
@@ -1188,7 +1175,7 @@ cl_address_space::~cl_address_space(void)
 }
 
 void
-cl_address_space::decode(t_addr as_begin, class cl_memory_chip *chip, t_addr chip_begin, t_addr size)
+cl_address_space::decode(t_addr as_begin, class cl_chip *chip, t_addr chip_begin, t_addr size)
 {
   class cl_address_decoder *ad= new cl_address_decoder(this, chip, as_begin, as_begin + size - 1, chip_begin);
   ad->init();
@@ -1197,7 +1184,7 @@ cl_address_space::decode(t_addr as_begin, class cl_memory_chip *chip, t_addr chi
 }
 
 void
-cl_address_space::decode(t_addr as_begin, class cl_memory_chip *chip)
+cl_address_space::decode(t_addr as_begin, class cl_chip *chip)
 {
   decode(as_begin, chip, 0, chip->get_size());
 }
@@ -1574,36 +1561,18 @@ cl_memory_list::add(class cl_memory *mem)
 
 
 /*
- *                                                                  Memory chip
+ *                                                                  Chip
  */
 
-cl_memory_chip::cl_memory_chip(const char *id,
-			       int asize,
-			       int awidth,
-			       int initial):
+cl_chip::cl_chip(const char *id, int asize, int awidth, int initial):
   cl_memory(id, asize, awidth)
 {
-  array= (t_mem *)malloc(size * sizeof(array[0]));
   flags= (uchar *)calloc(size, sizeof(flags[0]));
   init_value= initial;
-  array_is_mine= true;
   cella= NULL;
 }
 
-cl_memory_chip::cl_memory_chip(const char *id,
-			       int asize,
-			       int awidth,
-			       t_mem *aarray):
-  cl_memory(id, asize, awidth)
-{
-  array= aarray;
-  flags= (uchar *)calloc(size, sizeof(flags[0]));
-  init_value= 0;
-  array_is_mine= false;
-  cella= NULL;
-}
-
-cl_memory_chip::~cl_memory_chip(void)
+cl_chip::~cl_chip(void)
 {
   if (cella)
     {
@@ -1613,30 +1582,19 @@ cl_memory_chip::~cl_memory_chip(void)
       free(cella);
     }
 
-  if (array &&
-      array_is_mine)
-    free(array);
-
   free(flags);
 }
 
 int
-cl_memory_chip::init(void)
+cl_chip::init(void)
 {
   cl_memory::init();
-
-  if (array_is_mine)
-    {
-      for (int i= 0; i < size; i++)
-	set(i, (init_value<0)?rand():(init_value));
-    }
-
   return 0;
 }
 
 
 class cl_memory_cell *
-cl_memory_chip::get_cell(t_addr addr)
+cl_chip::get_cell(t_addr addr)
 {
   if (size <= addr)
     return(0);
@@ -1653,37 +1611,28 @@ cl_memory_chip::get_cell(t_addr addr)
   return cella[addr];
 }
 
-t_mem *
-cl_memory_chip::get_slot(t_addr addr)
-{
-  if (!array ||
-      size <= addr)
-    return(0);
-  return(&array[addr]);
-}
-
 uchar
-cl_memory_chip::get_flags(t_addr addr)
+cl_chip::get_flags(t_addr addr)
 {
-  if (array && addr < size)
+  if (flags && addr < size)
     return flags[addr];
 
   return 0;
 }
 
 bool
-cl_memory_chip::get_flag(t_addr addr, enum cell_flag flag)
+cl_chip::get_flag(t_addr addr, enum cell_flag flag)
 {
-  if (array && addr < size)
+  if (flags && addr < size)
     return flags[addr] & flag;
 
   return 0;
 }
 
 void
-cl_memory_chip::set_flag(t_addr addr, enum cell_flag flag, bool val)
+cl_chip::set_flag(t_addr addr, enum cell_flag flag, bool val)
 {
-  if (array && addr < size)
+  if (flags && addr < size)
     {
       if (val)
         flags[addr] |= flag;
@@ -1693,9 +1642,9 @@ cl_memory_chip::set_flag(t_addr addr, enum cell_flag flag, bool val)
 }
 
 t_mem
-cl_memory_chip::read(t_addr addr)
+cl_chip::read(t_addr addr)
 {
-  if (array && addr < size)
+  if (addr < size)
     {
       if (cella && cella[addr])
         return cella[addr]->read();
@@ -1705,9 +1654,9 @@ cl_memory_chip::read(t_addr addr)
 }
 
 t_mem
-cl_memory_chip::read(t_addr addr, enum hw_cath skip)
+cl_chip::read(t_addr addr, enum hw_cath skip)
 {
-  if (array && addr < size)
+  if (addr < size)
     {
       if (cella && cella[addr])
         return cella[addr]->read(skip);
@@ -1717,9 +1666,9 @@ cl_memory_chip::read(t_addr addr, enum hw_cath skip)
 }
 
 t_mem
-cl_memory_chip::write(t_addr addr, t_mem val)
+cl_chip::write(t_addr addr, t_mem val)
 {
-  if (array && addr < size)
+  if (addr < size)
     {
       if (cella && cella[addr])
         return cella[addr]->write(val);
@@ -1729,80 +1678,46 @@ cl_memory_chip::write(t_addr addr, t_mem val)
   return 0;
 }
 
-t_mem
-cl_memory_chip::get(t_addr addr)
+void
+cl_chip::set_bit1(t_addr addr, t_mem bits)
 {
-  if (!array ||
-      size <= addr)
-    return(0);
-  return(array[addr]);
+  set(addr, get(addr) | bits);
 }
 
 void
-cl_memory_chip::set(t_addr addr, t_mem val)
+cl_chip::set_bit0(t_addr addr, t_mem bits)
 {
-  if (!array ||
-      size <= addr)
-    return;
-
-  if (!(flags[addr] & CELL_READ_ONLY))
-    array[addr]= val & data_mask;
-}
-
-void
-cl_memory_chip::download(t_addr addr, t_mem val)
-{
-  if (!array ||
-      size <= addr)
-    return;
-  array[addr]= val & data_mask;
-}
-
-void
-cl_memory_chip::set_bit1(t_addr addr, t_mem bits)
-{
-  if (!array ||
-      size <= addr)
-    return;
-  array[addr]|= (bits & data_mask);
-}
-
-void
-cl_memory_chip::set_bit0(t_addr addr, t_mem bits)
-{
-  if (!array ||
-      size <= addr)
-    return;
-  array[addr]&= ((~bits) & data_mask);
+  set(addr, get(addr) & (~bits));
 }
 
 t_mem
-cl_memory_chip::wadd(t_addr addr, long what)
+cl_chip::wadd(t_addr addr, long what)
 {
-  if (!array ||
-      size <= addr)
-    return 0;
-  return array[addr]= (array[addr] + what) & data_mask;
+  set(addr, get(addr) + what);
+  return get(addr);
 }
 
 bool
-cl_memory_chip::is_owned(class cl_memory_cell *cell, t_addr *addr, int start, int end)
+cl_chip::is_owned(class cl_memory_cell *cell, t_addr *addr, int start, int end)
 {
-  for (int i = start; i < end; i++)
+  if (cella)
     {
-      if (cella && cella[i] == cell)
+      for (int i = start; i < end; i++)
         {
-          if (addr)
-            *addr = i;
-          return true;
-	}
+          if (cella[i] == cell)
+            {
+              if (addr)
+                *addr = i;
+              return true;
+	    }
+        }
     }
 
   return false;
 }
 
 void
-cl_memory_chip::print_info(chars pre, class cl_console_base *con)
+cl_chip::print_info(chars pre, class cl_console_base *con)
 {
   char *n= (char*)(get_name());
   if (!hidden)
@@ -1815,6 +1730,196 @@ cl_memory_chip::print_info(chars pre, class cl_console_base *con)
 		     n,
 		     width, data_format, addr_format);
     }
+}
+
+
+/*
+ *                                                                  Memory chip (generic)
+ */
+
+cl_memory_chip::cl_memory_chip(const char *id, int size, int width, int initial):
+  cl_chip(id, size, width, initial)
+{
+  array= (t_mem *)malloc(size * sizeof(array[0]));
+  for (int i = 0, mask = 0; i < width; i++, mask |= (1 << i));
+  mask = (1 << width) - 1;
+  init_value= initial;
+  array_is_mine= true;
+}
+
+cl_memory_chip::cl_memory_chip(const char *id, int size, int width, t_mem *array):
+  cl_chip(id, size, width, 0)
+{
+  this->array= array;
+  for (int i = 0, mask = 0; i < width; i++, mask |= (1 << i));
+  array_is_mine= false;
+}
+
+cl_memory_chip::~cl_memory_chip(void)
+{
+  if (array && array_is_mine)
+    free(array);
+}
+
+int
+cl_memory_chip::init(void)
+{
+  cl_chip::init();
+
+  if (array_is_mine)
+    {
+      for (int i= 0; i < size; i++)
+	set(i, (init_value<0)?rand():(init_value));
+    }
+
+  return 0;
+}
+
+t_mem
+cl_memory_chip::get(t_addr addr)
+{
+  if (array && addr < size)
+    return (array[addr]);
+  return(0);
+}
+
+void
+cl_memory_chip::set(t_addr addr, t_mem val)
+{
+  if (array && addr < size &&
+      !(flags[addr] & CELL_READ_ONLY))
+    array[addr]= val & mask;
+}
+
+void
+cl_memory_chip::download(t_addr addr, t_mem val)
+{
+  if (array || addr < size)
+    array[addr]= val & mask;
+}
+/*
+ *                                                                  Memory chip (8bit)
+ */
+
+cl_chip_8bit::cl_chip_8bit(const char *id, int size, int initial):
+  cl_chip(id, size, 8, initial)
+{
+  array= (u8_t *)malloc(size * sizeof(array[0]));
+  init_value= initial;
+  array_is_mine= true;
+}
+
+cl_chip_8bit::cl_chip_8bit(const char *id, int size, u8_t *array):
+  cl_chip(id, size, 8, 0)
+{
+  this->array= array;
+  array_is_mine= false;
+}
+
+cl_chip_8bit::~cl_chip_8bit(void)
+{
+  if (array && array_is_mine)
+    free(array);
+}
+
+int
+cl_chip_8bit::init(void)
+{
+  cl_chip::init();
+
+  if (array_is_mine)
+    {
+      for (int i= 0; i < size; i++)
+	set(i, (init_value<0)?rand():(init_value));
+    }
+
+  return 0;
+}
+
+t_mem
+cl_chip_8bit::get(t_addr addr)
+{
+  if (array && addr < size)
+    return (array[addr]);
+  return(0);
+}
+
+void
+cl_chip_8bit::set(t_addr addr, t_mem val)
+{
+  if (array && addr < size &&
+      !(flags[addr] & CELL_READ_ONLY))
+    array[addr]= val;
+}
+
+void
+cl_chip_8bit::download(t_addr addr, t_mem val)
+{
+  if (array || addr < size)
+    array[addr]= val;
+}
+
+
+/*
+ *                                                                  Memory chip (16bit)
+ */
+
+cl_chip_16bit::cl_chip_16bit(const char *id, int size, int initial):
+  cl_chip(id, size, 16, initial)
+{
+  array= (u16_t *)malloc(size * sizeof(array[0]));
+  init_value= initial;
+  array_is_mine= true;
+}
+
+cl_chip_16bit::cl_chip_16bit(const char *id, int size, u16_t *array):
+  cl_chip(id, size, 16, 0)
+{
+  this->array= array;
+  array_is_mine= false;
+}
+
+cl_chip_16bit::~cl_chip_16bit(void)
+{
+  if (array && array_is_mine)
+    free(array);
+}
+
+int
+cl_chip_16bit::init(void)
+{
+  cl_chip::init();
+
+  if (array_is_mine)
+    {
+      for (int i= 0; i < size; i++)
+	set(i, (init_value<0)?rand():(init_value));
+    }
+
+  return 0;
+}
+
+t_mem
+cl_chip_16bit::get(t_addr addr)
+{
+  if (array && addr < size)
+    return (array[addr]);
+  return(0);
+}
+
+void
+cl_chip_16bit::set(t_addr addr, t_mem val)
+{
+  if (array && addr < size &&
+      !(flags[addr] & CELL_READ_ONLY))
+    array[addr]= val;
+}
+
+void
+cl_chip_16bit::download(t_addr addr, t_mem val)
+{
+  if (array || addr < size)
+    array[addr]= val;
 }
 
 
