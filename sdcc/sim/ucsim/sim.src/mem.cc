@@ -844,7 +844,6 @@ cl_memory_cell::cl_memory_cell(class cl_chip *chip, t_addr addr)//: cl_base()
   this->chip= chip;
   this->chipaddr= addr;
 
-  operators= NULL;
   //bank= 0;
   //banked_data_ptrs= 0;
 #ifdef STATISTIC
@@ -895,10 +894,7 @@ cl_memory_cell::read(void)
 #ifdef STATISTIC
   nuof_reads++;
 #endif
-  if (operators)
-    return(operators->read());
-  else
-    return get();
+  return chip->read(chipaddr);
 }
 
 t_mem
@@ -907,10 +903,7 @@ cl_memory_cell::read(enum hw_cath skip)
 #ifdef STATISTIC
   nuof_reads++;
 #endif
-  if (operators)
-    return(operators->read(skip));
-  else
-    return get();
+  return chip->read(chipaddr, skip);
 }
 
 t_mem
@@ -925,13 +918,7 @@ cl_memory_cell::write(t_mem val)
 #ifdef STATISTIC
   nuof_writes++;
 #endif
-  if (chip->width != 1)
-    val &= mask;
-
-  if (operators)
-    val = operators->write(val) & mask;
-
-  return set(val);
+  return chip->write(chipaddr, val);
 }
 
 t_mem
@@ -1003,93 +990,33 @@ cl_memory_cell::wtoggle_bits(t_mem bits)
 void
 cl_memory_cell::append_operator(class cl_memory_operator *op)
 {
-  if (!operators)
-    operators= op;
-  else
-    {
-      class cl_memory_operator *o= operators, *n;
-      n= o->get_next();
-      while (n)
-	{
-	  o= n;
-	  n= o->get_next();
-	}
-      o->set_next(op);
-    }
-}
-
-void
-cl_memory_cell::prepend_operator(class cl_memory_operator *op)
-{
-  if (op)
-    {
-      op->set_next(operators);
-      operators= op;
-    }
+  chip->append_operator(chipaddr, op);
 }
 
 void
 cl_memory_cell::del_operator(class cl_brk *brk)
 {
-  if (!operators)
-    return;
-  class cl_memory_operator *op= operators;
-  if (operators->match(brk))
-    {
-      operators= op->get_next();
-      delete op;
-    }
-  else
-    {
-      while (op->get_next() &&
-	     !op->get_next()->match(brk))
-	op= op->get_next();
-      if (op->get_next())
-	{
-	  class cl_memory_operator *m= op->get_next();
-	  op->set_next(m->get_next());;
-	  delete m;
-	}
-    }
+  chip->del_operator(chipaddr, brk);
 }
 
-void 	 
+void
 cl_memory_cell::del_operator(class cl_hw *hw)
 {
-  if (!operators)
-    return;
-  class cl_memory_operator *op= operators;
-  if (operators->match(hw))
-    {
-      operators= op->get_next();
-      delete op;
-    }
-  else
-    {
-      while (op->get_next() &&
-	     !op->get_next()->match(hw))
-	op= op->get_next();
-      if (op->get_next())
-	{
-	  class cl_memory_operator *m= op->get_next();
-	  op->set_next(m->get_next());
-	  delete m;
-	}
-    }
+  chip->del_operator(chipaddr, hw);
 }
 
 class cl_memory_cell *
 cl_memory_cell::add_hw(class cl_hw *hw/*, t_addr addr*/)
 {
   class cl_hw_operator *o= new cl_hw_operator(this/*, addr*//*, data, mask*/, hw);
-  append_operator(o);
+  chip->append_operator(chipaddr, o);
   return(this);
 }
 
 void 	 
 cl_memory_cell::remove_hw(class cl_hw *hw) 	 
 { 	 
-  del_operator(hw); 	 
+  chip->del_operator(chipaddr, hw);
 }
 
 /*class cl_hw *
@@ -1115,22 +1042,7 @@ cl_memory_cell::print_info(chars pre, class cl_console_base *con)
   if (!(flags & CELL_DECODED))
     con->dd_printf(" NDC");
   con->dd_printf("\n");
-  print_operators(pre, con);
-}
-
-void
-cl_memory_cell::print_operators(chars pre, class cl_console_base *con)
-{
-  class cl_memory_operator *o= operators;
-  if (!operators)
-    return;
-  int i= 0;
-  while (o)
-    {
-      printf("%s %02d. %s\n", (char*)pre, i, o->get_name("?"));
-      i++;
-      o= o->get_next();
-    }
+  chip->print_operators(chipaddr, pre, con);
 }
 
 
@@ -1570,6 +1482,7 @@ cl_chip::cl_chip(const char *id, int asize, int awidth, int initial):
   flags= (uchar *)calloc(size, sizeof(flags[0]));
   init_value= initial;
   cella= NULL;
+  operators= NULL;
 }
 
 cl_chip::~cl_chip(void)
@@ -1641,13 +1554,89 @@ cl_chip::set_flag(t_addr addr, enum cell_flag flag, bool val)
     }
 }
 
+void
+cl_chip::append_operator(t_addr addr, class cl_memory_operator *op)
+{
+  if (addr < size)
+    {
+      if (!operators)
+        operators= (cl_memory_operator **)calloc(size, sizeof(operators[0]));
+
+      if (!operators[addr])
+        operators[addr]= op;
+      else
+        {
+          class cl_memory_operator *o= operators[addr], *n;
+          n= o->get_next();
+          while (n)
+	    {
+	      o= n;
+	      n= o->get_next();
+	    }
+          o->set_next(op);
+        }
+    }
+}
+
+void
+cl_chip::del_operator(t_addr addr, class cl_brk *brk)
+{
+  if (addr < size && operators && operators[addr])
+    {
+      class cl_memory_operator *op = operators[addr];
+      if (op->match(brk))
+        {
+          operators[addr] = op->get_next();
+          delete op;
+        }
+      else
+        {
+	  for (class cl_memory_operator *n= op->get_next(); n; op = n, n = n->get_next())
+            {
+              if (n->match(brk))
+                {
+	          op->set_next(n->get_next());;
+	          delete n;
+		  break;
+                }
+            }
+        }
+    }
+}
+
+void
+cl_chip::del_operator(t_addr addr, class cl_hw *hw)
+{
+  if (addr < size && operators && operators[addr])
+    {
+      class cl_memory_operator *op = operators[addr];
+      if (op->match(hw))
+        {
+          operators[addr] = op->get_next();
+          delete op;
+        }
+      else
+        {
+	  for (class cl_memory_operator *n= op->get_next(); n; op = n, n = n->get_next())
+            {
+              if (n->match(hw))
+                {
+	          op->set_next(n->get_next());;
+	          delete n;
+		  break;
+                }
+            }
+        }
+    }
+}
+
 t_mem
 cl_chip::read(t_addr addr)
 {
   if (addr < size)
     {
-      if (cella && cella[addr])
-        return cella[addr]->read();
+      if (operators && operators[addr])
+        return (operators[addr]->read());
       return get(addr);
     }
   return 0;
@@ -1658,8 +1647,8 @@ cl_chip::read(t_addr addr, enum hw_cath skip)
 {
   if (addr < size)
     {
-      if (cella && cella[addr])
-        return cella[addr]->read(skip);
+      if (operators && operators[addr])
+        return (operators[addr]->read(skip));
       return get(addr);
     }
   return 0;
@@ -1670,10 +1659,10 @@ cl_chip::write(t_addr addr, t_mem val)
 {
   if (addr < size)
     {
-      if (cella && cella[addr])
-        return cella[addr]->write(val);
+      if (operators && operators[addr])
+        return (operators[addr]->write(val));
       set(addr, val);
-      return get(addr);
+      return val;
     }
   return 0;
 }
@@ -1681,20 +1670,19 @@ cl_chip::write(t_addr addr, t_mem val)
 void
 cl_chip::set_bit1(t_addr addr, t_mem bits)
 {
-  set(addr, get(addr) | bits);
+  write(addr, read(addr) | bits);
 }
 
 void
 cl_chip::set_bit0(t_addr addr, t_mem bits)
 {
-  set(addr, get(addr) & (~bits));
+  write(addr, read(addr) & (~bits));
 }
 
 t_mem
 cl_chip::wadd(t_addr addr, long what)
 {
-  set(addr, get(addr) + what);
-  return get(addr);
+  return write(addr, read(addr) + what);
 }
 
 bool
@@ -1714,6 +1702,17 @@ cl_chip::is_owned(class cl_memory_cell *cell, t_addr *addr, int start, int end)
     }
 
   return false;
+}
+
+void
+cl_chip::print_operators(t_addr addr, chars pre, class cl_console_base *con)
+{
+  if (operators && operators[addr])
+    {
+      int i = 0;
+      for (class cl_memory_operator *o = operators[addr]; o; o = o->get_next())
+        printf("%s %02d. %s\n", (char*)pre, i++, o->get_name("?"));
+    }
 }
 
 void
@@ -1797,6 +1796,8 @@ cl_memory_chip::download(t_addr addr, t_mem val)
   if (array || addr < size)
     array[addr]= val & mask;
 }
+
+
 /*
  *                                                                  Memory chip (8bit)
  */
@@ -2195,7 +2196,7 @@ cl_banker::init()
 
   class cl_memory_cell *cell= banker_as->get_cell(banker_addr);
   if (cell)
-    cell->prepend_operator(new cl_bank_switcher_operator(cell, this));
+    cell->append_operator(new cl_bank_switcher_operator(cell, this));
 
   return 0;
 }

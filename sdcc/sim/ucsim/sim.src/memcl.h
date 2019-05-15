@@ -233,7 +233,6 @@ class cl_memory_cell: public cl_abs_base
  protected:
   t_mem *data;
   t_mem def_data;
-  class cl_memory_operator *operators;
  public:
   cl_memory_cell(cl_chip *chip, t_addr addr);
   virtual ~cl_memory_cell(void);
@@ -263,7 +262,6 @@ class cl_memory_cell: public cl_abs_base
   virtual void wtoggle_bits(t_mem bits);
   
   virtual void append_operator(class cl_memory_operator *op);
-  virtual void prepend_operator(class cl_memory_operator *op);
   virtual void del_operator(class cl_brk *brk);
   virtual void del_operator(class cl_hw *hw);
 
@@ -271,7 +269,6 @@ class cl_memory_cell: public cl_abs_base
   virtual void remove_hw(class cl_hw *hw);
 
   virtual void print_info(chars pre, class cl_console_base *con);
-  virtual void print_operators(cchars pre, class cl_console_base *con);
 };
 
 class cl_dummy_cell: public cl_memory_cell
@@ -372,6 +369,7 @@ protected:
   class cl_memory_cell **cella;
   uchar *flags;
   int init_value;
+  class cl_memory_operator **operators;
 public:
   cl_chip(const char *id, int asize, int awidth, int initial= -1);
   virtual ~cl_chip(void);
@@ -385,6 +383,10 @@ public:
   virtual bool get_flag(t_addr addr, enum cell_flag flag);
   virtual void set_flag(t_addr addr, enum cell_flag flag, bool val);
 
+  virtual void append_operator(t_addr addr, class cl_memory_operator *op);
+  virtual void del_operator(t_addr addr, class cl_brk *brk);
+  virtual void del_operator(t_addr addr, class cl_hw *hw);
+
   virtual t_mem read(t_addr addr);
   virtual t_mem read(t_addr addr, enum hw_cath skip);
   virtual t_mem get(t_addr addr) = 0;
@@ -396,6 +398,7 @@ public:
   virtual t_mem wadd(t_addr addr, long what);
   virtual bool is_owned(class cl_memory_cell *cell, t_addr *addr, int start, int end);
 
+  virtual void print_operators(t_addr addr, chars pre, class cl_console_base *con);
   virtual void print_info(chars pre, class cl_console_base *con);
 };
 
