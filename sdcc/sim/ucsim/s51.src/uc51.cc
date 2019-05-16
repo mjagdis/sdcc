@@ -1759,7 +1759,6 @@ cl_51core::do_interrupt(void)
     {
       class cl_it_src *is= (class cl_it_src *)(it_sources->at(i));
       if (is->is_active() &&
-	  is->enabled() &&
 	  is->pending())
 	{
 	  int pr= priority_of(is->ie_mask);

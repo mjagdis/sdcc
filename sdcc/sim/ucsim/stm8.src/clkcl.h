@@ -97,6 +97,9 @@ class cl_clk: public cl_hw
   virtual bool tim(int id, t_mem *val) { return false; }
   virtual bool usart(int id, t_mem *val) { return false; }
 
+  virtual void halt(void) {};
+  virtual void restart_after_halt(void) {};
+
   virtual void print_info(class cl_console_base *con);
 };
 
@@ -118,6 +121,9 @@ private:
   virtual void write(class cl_memory_cell *cell, t_mem *val);
   virtual bool tim(int id, t_mem *val);
   virtual bool usart(int id, t_mem *val);
+
+  virtual void halt(void);
+  virtual void restart_after_halt(void);
 };
 
 class cl_clk_all: public cl_clk
@@ -135,6 +141,9 @@ private:
   virtual void write(class cl_memory_cell *cell, t_mem *val);
   virtual bool tim(int id, t_mem *val);
   virtual bool usart(int id, t_mem *val);
+
+  virtual void halt(void);
+  virtual void restart_after_halt(void);
 };
 
 class cl_clk_l101: public cl_clk
@@ -147,6 +156,8 @@ class cl_clk_l101: public cl_clk
 
   virtual bool tim(int id, t_mem *val);
   virtual bool usart(int id, t_mem *val);
+
+  virtual void restart_after_halt(void);
 };
 
 

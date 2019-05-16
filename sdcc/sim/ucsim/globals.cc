@@ -63,7 +63,9 @@ struct id_element cpu_states[]= {
   { stUNDEF,	"All" },
   { stGO,	"Run" },
   { stIDLE,	"Idle" },
+  { stWAIT,	"Wait" },
   { stPD,	"PowerDown" },
+  { stSTALL,	"Stall" },
   { 0, 0 }
 };
 

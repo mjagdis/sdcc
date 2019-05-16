@@ -138,38 +138,11 @@ cl_it_src::clear(void)
 void
 cl_it_src::write(class cl_memory_cell *cell, t_mem *val)
 {
-  t_mem iev= ie_cell->get();
-  t_mem srcv= src_cell->get();
-  t_mem ier, srcr;
-  
-  if (cell == ie_cell)
-    {
-      //printf("ITSRC ie=%x\n", *val);
-      iev= *val;
-    }
-  if (cell == src_cell)
-    {
-      //printf("ITSRC src=%x\n", *val);
-      srcv= *val;
-    }
-  ier= iev&ie_mask;
-  srcr= srcv&src_mask;
-  /*
-  printf("%2d iev =%x & %x = %x\n", nuof, iev, ie_mask, ier);
-  printf("%2d srcv=%x & %x = %x\n", nuof, srcv, src_mask, srcr);
-  printf("%2d ie=%s src=%s req=%s\n", nuof,
-	 ier?"true":"false",
-	 srcr?"true":"false",
-	 (ier&&srcr)?"TRUE":"FALSE");
-  */
-  if (ier)
-    {
-      if (srcr)
-	{
-	  //printf("%2d IRQ\n", nuof);
-	  uc->irq= true;
-	}
-    }
+  t_mem iev= (cell == ie_cell ? *val : ie_cell->get());
+  t_mem srcv= (cell == src_cell ? *val : src_cell->get());
+
+  if ((iev & ie_mask) && (srcv & src_mask))
+    uc->irq= true;
 }
 
 t_mem

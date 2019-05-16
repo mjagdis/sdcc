@@ -500,6 +500,7 @@ cl_uc::reset(void)
   ticks->ticks= 0;
   isr_ticks->ticks= 0;
   idle_ticks->ticks= 0;
+  main_ticks->ticks= 0;
   vc.inst= vc.fetch= vc.rd= vc.wr= 0;
   /* FIXME should we clear user counters?*/
   il= (class it_level *)(it_levels->top());
@@ -2021,7 +2022,6 @@ cl_uc::tick(int cycles)
 int
 cl_uc::update_tickers(bool rtime, double freq, int cycles)
 {
-
   class it_level *il= (class it_level *)(it_levels->top());
   int tickers_updated = 0;
 
@@ -2208,8 +2208,7 @@ cl_uc::do_inst(int step)
       
       post_inst();
 
-      if ((res == resGO) &&
-	  irq)
+      if (irq && (res == resGO || res == resNOT_DONE))
 	{
 	  //printf("DO INTERRUPT PC=%lx\n", PC);
 	  int r= do_interrupt();
@@ -2225,7 +2224,7 @@ cl_uc::do_inst(int step)
 	  res= resBREAKPOINT;
 	}
     }
-  if (res != resGO)
+  if (res != resGO && res != resNOT_DONE)
     sim->stop(res);
   return(res);
 }

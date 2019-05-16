@@ -42,6 +42,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 class cl_stm8: public cl_uc
 {
 private:
+  class cl_memory_cell *cfg_gcr;
   unsigned int func_index;
   unsigned int label_index;
   unsigned int loop_index;
@@ -63,6 +64,10 @@ public:
   class cl_itc *itc;
   class cl_it_src *trap_src;
   class cl_flash *flash_ctrl;
+  bool wakeup;
+private:
+  void context_save(void);
+  void context_restore(void);
 public:
   cl_stm8(struct cpu_entry *IType, class cl_sim *asim);
   virtual int init(void);
@@ -84,6 +89,7 @@ public:
   virtual int clock_per_cycle(void);
   virtual int tick(int cycles_cpu);
   virtual int tick_master(int cycles_master);
+  virtual int tick_stall(double seconds);
   virtual int exec_inst(void);
 
   virtual const char *get_disasm_info(t_addr addr,

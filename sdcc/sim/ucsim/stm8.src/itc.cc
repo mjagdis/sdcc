@@ -34,6 +34,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "itsrccl.h"
 
 // local
+#include "stm8cl.h"
 #include "itccl.h"
 
 
@@ -61,7 +62,7 @@ cl_itc::init(void)
   exti_conf1= uc->rom->get_cell(0x50a5);
   exti_conf2= uc->rom->get_cell(0x50ab);
 
-  // Although we set up all registers above not all STM8 variants
+  // Although we set up all EXTI registers above not all STM8 variants
   // use or expose them all. We only add vars for those that are
   // user-visible on this particular MCU.
   cl_var *v;
@@ -97,6 +98,16 @@ cl_itc::init(void)
         uc->vars->add(v= new cl_var("EXTI_CONF", uc->rom, 0x50a5,
                                     "External interrupt port select register", 7, 0));
         v->init();
+
+        wfe_cr1= register_cell(uc->rom, 0x50a6);
+        uc->vars->add(v= new cl_var("WFE_CR1", uc->rom, 0x50a6,
+                                    "WFE control register 1"));
+        v->init();
+
+        wfe_cr2= register_cell(uc->rom, 0x50a7);
+        uc->vars->add(v= new cl_var("WFE_CR2", uc->rom, 0x50a6,
+                                    "WFE control register 2"));
+        v->init();
       }
 
     if (uc->type->type == CPU_STM8L)
@@ -108,6 +119,19 @@ cl_itc::init(void)
         uc->vars->add(v= new cl_var("EXTI_CONF2", uc->rom, 0x50ab,
                                     "External interrupt port select register 2", 7, 0));
         v->init();
+
+        wfe_cr3= register_cell(uc->rom, 0x50a8);
+        uc->vars->add(v= new cl_var("WFE_CR3", uc->rom, 0x50a8,
+                                    "WFE control register 3"));
+        v->init();
+
+        if (uc->type->subtype != DEV_STM8L15x46)
+          {
+            wfe_cr4= register_cell(uc->rom, 0x50a9);
+            uc->vars->add(v= new cl_var("WFE_CR4", uc->rom, 0x50a9,
+                                        "WFE control register 4"));
+            v->init();
+          }
       }
 
   return(0);
@@ -151,6 +175,15 @@ cl_itc::write(class cl_memory_cell *cell, t_mem *val)
       v&= mask;
       o|= v;
       *val= o;
+    }
+  else if (cell == wfe_cr1 ||
+           cell == wfe_cr2 ||
+           cell == wfe_cr3 ||
+           cell == wfe_cr4)
+    {
+      // If we change a WFE flag we must recheck interrupts
+      // in case a handler now needs to be called.
+      uc->irq = true;
     }
 }
 
@@ -224,6 +257,44 @@ cl_itc::print_info(class cl_console_base *con)
 	}
     }
   print_cfg_info(con);
+}
+
+
+cl_stm8_it_src::cl_stm8_it_src(cl_uc  *Iuc,
+                               int    Inuof,
+                               class  cl_memory_cell *Iie_cell,
+                               t_mem  Iie_mask,
+                               class  cl_memory_cell *Isrc_cell,
+                               t_mem  Isrc_mask,
+                               class  cl_memory_cell *Iwfe_cell,
+                               t_mem  Iwfe_mask,
+                               t_addr Iaddr,
+                               bool   Iclr_bit,
+                               bool   Iindirect,
+                               const  char *Iname,
+                               int    apoll_priority)
+  : cl_it_src(Iuc, Inuof, Iie_cell, Iie_mask, Isrc_cell, Isrc_mask, Iaddr, Iclr_bit, Iindirect, Iname, apoll_priority)
+{
+  stm8 = (cl_stm8 *)Iuc;
+  wfe_cell = Iwfe_cell;
+  wfe_mask = Iwfe_mask;
+}
+
+bool
+cl_stm8_it_src::pending(void)
+{
+  if (cl_it_src::pending())
+    {
+      // If the WFE_CR<n> bit is not set this is handled as a normal
+      // interrupt otherwise it is a wakeup event.
+      if (!wfe_cell ||
+          !(wfe_cell->get() & wfe_mask))
+        return true;
+      else
+        stm8->wakeup = true;
+    }
+
+  return false;
 }
 
 

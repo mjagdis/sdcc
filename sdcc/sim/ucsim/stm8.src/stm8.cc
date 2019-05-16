@@ -33,6 +33,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include <stdarg.h> /* for va_list */
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <ctype.h>
 #include "i_string.h"
 
@@ -70,6 +71,7 @@ cl_stm8::cl_stm8(struct cpu_entry *IType, class cl_sim *asim):
 {
   type= IType;
   flash_ctrl= NULL;
+  wakeup= false;
 }
 
 int
@@ -78,11 +80,21 @@ cl_stm8::init(void)
   cl_uc::init(); /* Memories now exist */
 
   // MAIN and IDLE (wait for interrupt) counters are created by default. We also
-  // need HALT (powered down).
+  // need HALT (powered down), STALL (stalled waiting for some action to complete)
+  // and, on some variants, WAIT (wait for event).
   class cl_ticker *ticker;
 
   ticker= new cl_ticker("halt", true, ticks->freq, +1, stPD);
   add_counter(ticker, ticker->get_name());
+
+  ticker= new cl_ticker("stall", true, ticks->freq, +1, stSTALL);
+  add_counter(ticker, ticker->get_name());
+
+  if (type->type == CPU_STM8L || type->type == CPU_STM8L101)
+    {
+      ticker= new cl_ticker("wait", true, ticks->freq, +1, stWAIT);
+      add_counter(ticker, ticker->get_name());
+    }
 
   //rom = address_space(MEM_ROM_ID);
   //ram = mem(MEM_XRAM);
@@ -116,6 +128,7 @@ cl_stm8::reset(void)
   regs.Y = 0;
   regs.CC = 0x28;
   //regs.VECTOR = 1;
+  cfg_gcr->set(0);
   PC= 0x8000;
 }
 
@@ -430,11 +443,25 @@ cl_stm8::mk_hw_elements(void)
   else
     {
       char name[] = "EXTI0";
-      for (int i= 0; i <= 7; i++, name[4]++)
+      for (int i= 0; i < 4; i++, name[4]++)
         {
-          it_sources->add(is= new cl_it_src(this, 8 + i,
+          it_sources->add(is= new cl_stm8_it_src(this, 8 + i,
                     itc->exti_sr1, 1 << i,
                     itc->exti_sr1, 1 << i,
+                    itc->wfe_cr1, 1 << (4 + i),
+                    0x8028 + i * 4,
+                    false,
+                    false,
+                    strdup(name),
+                    25*10+i));
+          is->init();
+        }
+      for (int i= 4; i <= 7; i++, name[4]++)
+        {
+          it_sources->add(is= new cl_stm8_it_src(this, 8 + i,
+                    itc->exti_sr1, 1 << i,
+                    itc->exti_sr1, 1 << i,
+                    itc->wfe_cr2, 1 << (i - 4),
                     0x8028 + i * 4,
                     false,
                     false,
@@ -450,9 +477,10 @@ cl_stm8::mk_hw_elements(void)
 	      mk_port(0x5014, "pe");
 	      mk_port(0x5019, "pf");
 
-              it_sources->add(is= new cl_it_src(this, 5,
+              it_sources->add(is= new cl_stm8_it_src(this, 5,
                         itc->exti_sr2, (1 << 3) | (1 << 2),
                         itc->exti_sr2, (1 << 3) | (1 << 2),
+                        itc->wfe_cr2, 1 << 6,
                         0x801c,
                         false,
                         false,
@@ -469,9 +497,10 @@ cl_stm8::mk_hw_elements(void)
 	    {
 	      mk_port(0x501e, "pg");
 
-              it_sources->add(is= new cl_it_src(this, 6,
+              it_sources->add(is= new cl_stm8_it_src(this, 6,
                         itc->exti_sr2, (1 << 4) | (1 << 0),
                         itc->exti_sr2, (1 << 4) | (1 << 0),
+                        itc->wfe_cr2, 1 << 4,
                         0x8020,
                         false,
                         false,
@@ -484,9 +513,10 @@ cl_stm8::mk_hw_elements(void)
 	          mk_port(0x5023, "ph");
 	          mk_port(0x5028, "pi");
 
-                  it_sources->add(is= new cl_it_src(this, 7,
+                  it_sources->add(is= new cl_stm8_it_src(this, 7,
                             itc->exti_sr2, (1 << 5) | (1 << 1),
                             itc->exti_sr2, (1 << 5) | (1 << 1),
+                            itc->wfe_cr2, 1 << 5,
                             0x8024,
                             false,
                             false,
@@ -496,9 +526,10 @@ cl_stm8::mk_hw_elements(void)
 	        }
               else
                 {
-                  it_sources->add(is= new cl_it_src(this, 7,
+                  it_sources->add(is= new cl_stm8_it_src(this, 7,
                             itc->exti_sr2, (1 << 1),
                             itc->exti_sr2, (1 << 1),
+                            itc->wfe_cr2, 1 << 5,
                             0x8024,
                             false,
                             false,
@@ -509,9 +540,10 @@ cl_stm8::mk_hw_elements(void)
 	    }
           else
             {
-              it_sources->add(is= new cl_it_src(this, 6,
+              it_sources->add(is= new cl_stm8_it_src(this, 6,
                         itc->exti_sr2, (1 << 0),
                         itc->exti_sr2, (1 << 0),
+                        itc->wfe_cr2, 1 << 4,
                         0x8020,
                         false,
                         false,
@@ -519,9 +551,10 @@ cl_stm8::mk_hw_elements(void)
                         25*10+6));
               is->init();
 
-              it_sources->add(is= new cl_it_src(this, 7,
+              it_sources->add(is= new cl_stm8_it_src(this, 7,
                         itc->exti_sr2, (1 << 1),
                         itc->exti_sr2, (1 << 1),
+                        itc->wfe_cr2, 1 << 5,
                         0x8024,
                         false,
                         false,
@@ -575,18 +608,20 @@ cl_stm8::mk_hw_elements(void)
           add_hw(h= new cl_tim4_l101(this, 4, 0x52E0));
           h->init();
 
-          it_sources->add(is= new cl_it_src(this, 6,
+          it_sources->add(is= new cl_stm8_it_src(this, 6,
                     itc->exti_sr2, (1 << 0),
                     itc->exti_sr2, (1 << 0),
+                    itc->wfe_cr2, 1 << 4,
                     0x8020,
                     false,
                     false,
                     "EXTIB",
                     25*10+6));
           is->init();
-          it_sources->add(is= new cl_it_src(this, 7,
+          it_sources->add(is= new cl_stm8_it_src(this, 7,
                     itc->exti_sr2, (1 << 1),
                     itc->exti_sr2, (1 << 1),
+                    itc->wfe_cr2, 1 << 5,
                     0x8024,
                     false,
                     false,
@@ -742,7 +777,6 @@ cl_stm8::make_memories(void)
 
   regs16= new cl_address_space("regs16", 0, 3, 16);
   regs16->init();
-
   regs16->get_cell(0)->decode((t_mem*)&regs.X);
   regs16->get_cell(1)->decode((t_mem*)&regs.Y);
   regs16->get_cell(2)->decode((t_mem*)&regs.SP);
@@ -761,6 +795,14 @@ cl_stm8::make_memories(void)
   vars->add(v= new cl_var(cchars("Y"), regs16, 1, "", 15, 0));
   v->init();
   vars->add(v= new cl_var(cchars("SP"), regs16, 2, "", 15, 0));
+  v->init();
+
+  cfg_gcr= rom->get_cell(0x7f60);
+  vars->add(v= new cl_var(cchars("CFG_GCR"), rom, 0x7f60, "", 7, 0));
+  v->init();
+  vars->add(v= new cl_var(cchars("CFG_GCR_AL"), rom, 0x7f60, "", 1, 1));
+  v->init();
+  vars->add(v= new cl_var(cchars("CFG_GCR_SWD"), rom, 0x7f60, "", 0, 0));
   v->init();
 }
 
@@ -1378,23 +1420,55 @@ cl_stm8::tick_master(int cycles_master)
 }
 
 int
+cl_stm8::tick_stall(double seconds)
+{
+  // When ticking for a given duration we assume that whatever caused
+  // the stall will allow us to continue as soon as it is done and
+  // that we do not need to wait for the next tick.
+  // i.e. we only need to account for the ticks that would otherwise
+  // have been missed and so we round down rather than up.
+  enum cpu_state old_state = state;
+  state = stSTALL;
+
+  int ret = tick_master((int)(seconds * xtal));
+
+  state = old_state;
+  return ret;
+}
+
+int
 cl_stm8::exec_inst(void)
 {
   t_mem code;
-  unsigned char cprefix; // prefix used for processing in functions
-  /*
-  if (regs.VECTOR) {
-    PC = get1(0x8000);
-	if (PC == 0x82) { // this is reserved opcode for vector table
-		regs.VECTOR = 0;
-		PC = get1(0x8001)*(1<<16);
-		PC += get2(0x8002);
-		return(resGO);
-	} else {
-		return( resERROR);
-	}
-  }
-  */
+  unsigned char cprefix;
+
+  if (state == stWAIT && wakeup)
+    {
+      state = stGO;
+
+      // Reverse the adjustment to PC that we did when starting the WFE. This was done
+      // so that a console interrupt would show the WFE rather than the subsequent
+      // instruction but now we _want_ the subsequent instruction.
+      PC += 2;
+    }
+  else if (state == stIDLE || state == stWAIT || state == stPD)
+    {
+      // FIXME: we could also override pre_inst to avoid incrementing inst in the first place.
+      vc.inst--;
+
+      // FIXME: do we need to do a breakpoint check here? It is normally done
+      // as part of the fetch of the first byte of code.
+
+      // FIXME: We really want HW to tell us when the next event is
+      // scheduled for. Putting an abitrary delay here slows the
+      // simulation too much or too little.
+      struct timespec t;
+      t.tv_sec= 0;
+      t.tv_nsec= 1000;
+      nanosleep(&t, NULL);
+      tick_master(1);
+      return resNOT_DONE;
+    }
 
   instPC= PC;
 
@@ -1479,23 +1553,36 @@ cl_stm8::exec_inst(void)
                return( inst_neg( code, cprefix));
                break;
             case 0x80: // IRET
-               pop1( regs.CC);
-               pop1( regs.A);
-               pop2( regs.X);
-               pop2( regs.Y);
-               pop1( tempi);
-               pop2( PC);
-               PC += (tempi <<16); //Add PCE to PC
-	       {
-		 class it_level *il= (class it_level *)(it_levels->top());
-		 if (il &&
-		     il->level >= 0)
-		   {
-		     il= (class it_level *)(it_levels->pop());
-		     delete il;
-		   }
-	       }
-               return(resGO);
+               {
+                 class it_level *il= (class it_level *)(it_levels->top());
+
+                 // RM0016 1.3.3: AL=1 in CFG_GCR: Interrupt-only activation. An IRET instruction
+                 // causes the CPU to go back to WFI/HALT mode without restoring context.
+                 // Errata (not STM8L): Activation level (AL bit) not functional in Halt mode. (Only WFI)
+                 if ((cfg_gcr->get() & 0x02))
+                   {
+                     if (il->state == stIDLE ||
+                         (il->state == stPD && (type->type == CPU_STM8L || type->type == CPU_STM8L101)))
+                       {
+                         // FIXME:Should we clear down the interrupt level as if we were just entering
+                         // WFI or should we leave it as the interrupt handler set it?
+                         FLAG_CLEAR(BIT_I0);
+                         FLAG_SET(BIT_I1);
+
+                         PC = il->PC;
+                         state = il->state;
+                       }
+                     else
+                       context_restore();
+                   }
+                 else
+                   context_restore();
+
+                 if (il->level >= 0)
+                   delete (class it_level *)(it_levels->pop());
+
+                 return(resGO);
+               }
             case 0x10: 
             case 0xA0:
             case 0xB0:
@@ -2130,9 +2217,42 @@ cl_stm8::exec_inst(void)
             case 0x70: // swap
                return( inst_swap( code, cprefix));
                break;
-            case 0x80: 
-	      //printf("************* HALT instruction reached !!!!\n");
-               return(resHALT);
+            case 0x80: // HALT
+               // RM0031: 7.8.1 states that the halt is delayed if there are pending
+               // events namely: SWBSY in CLK_SWCR, EEBUSY in CLK_REGCSR, RTCSWBSY
+               // in CLK_CRTCR or BEEPSWBSY in CLK_CBEEPR (if BEEP in active-halt
+               // mode is enabled).
+               // FIXME: If any of the above are pending we should insert the necessary
+               // ticks to complete them before continuing.
+               // FIXME: Should we be processing interrupts while waiting or not?
+               // FIXME: If there are any interrupts enabled for these events should
+               // we service them before halting or carry on and skip the HALT?
+
+               // PM004 HALT: The interrupt mask is reset, allowing interrupts to be fetched.
+               FLAG_CLEAR(BIT_I0);
+               FLAG_SET(BIT_I1);
+
+               // RM0031: 7.8.1 notes that the HALT instruction is not executed and
+               // program execution continues if there is an interrupt pending.
+               if (!irq)
+                 {
+                   // RM0016 1.2.1: The WFI/HALT instructions save the context in advance. If an
+                   // interrupt occurs while the CPU is in one of these modes, the latency is reduced.
+                   context_save();
+
+                   flash_ctrl->halt();
+                   clk->halt();
+                   state = stPD;
+
+                   // We back up the PC to the start of the instruction so that a console
+                   // interrupt will show us we're in HALT rather than the subsequent
+                   // instruction. Since the only way out of HALT is to restore the saved
+                   // context this value of PC has no bearing on future execution.
+                   PC -= 1;
+
+                   return(resNOT_DONE);
+                 }
+               return(resGO);
             case 0x90: // LD A, YH / XH
                if(cprefix==0x90) {
                   regs.A = (regs.Y >> 8) & 0xff;
@@ -2171,9 +2291,44 @@ cl_stm8::exec_inst(void)
             case 0x70: // CLR
                return( inst_clr( code, cprefix));
                break;
-            case 0x80: 
-	      //printf("************* WFI/WFE instruction not implemented !!!!\n");
-               return(resINV_INST);
+            case 0x80: // WFI/WFE
+               if (cprefix == 0x72)
+                 {
+                   // WFE
+                   if (type->type != CPU_STM8L && type->type != CPU_STM8L101)
+                     return resINV_INST;
+
+                   // PM004 WFE: Interrupt requests [...] are served normally, depending
+                   // on the CC.I[1:0] value.
+                   flash_ctrl->wait();
+                   state = stWAIT;
+
+                   // We back up the PC to the start of the instruction so that a console
+                   // interrupt will show us we're in WFI rather than the subsequent
+                   // instruction. Since WFE exits once an external event is pending this
+                   // PC value WILL be used and we MUST adjust it back at the point of wakeup.
+                   PC -= 2;
+                 }
+               else
+                 {
+                   // WFI
+                   // RM0016 1.2.1: The WFI/HALT instructions save the context in advance. If an
+                   // interrupt occurs while the CPU is in one of these modes, the latency is reduced.
+                   context_save();
+
+                   // PM004 WFI: The interrupt flag is cleared, allowing interrupts to be fetched.
+                   FLAG_CLEAR(BIT_I0);
+                   FLAG_SET(BIT_I1);
+                   flash_ctrl->wait();
+                   state = stIDLE;
+
+                   // We back up the PC to the start of the instruction so that a console
+                   // interrupt will show us we're in WFI rather than the subsequent
+                   // instruction. Since the only way out of WFI is to restore the saved
+                   // context this value of PC has no bearing on future execution.
+                   PC -= 1;
+                 }
+               return(resNOT_DONE);
             case 0x90:
                if(cprefix==0x90) {
                   regs.A = (regs.Y & 0xff);
@@ -2235,6 +2390,7 @@ cl_stm8::exec_inst(void)
 int
 cl_stm8::do_interrupt(void)
 {
+  wakeup = false;
   return cl_uc::do_interrupt();
 }
 
@@ -2275,28 +2431,68 @@ cl_stm8::priority_main(void)
  * Accept an interrupt
  */
 
+void
+cl_stm8::context_save(void)
+{
+  push2(PC & 0xffff);
+  push1(PC >> 16); //extended PC
+  push2(regs.Y);
+  push2(regs.X);
+  push1(regs.A);
+  push1(regs.CC);
+  tick(9);
+}
+
+void
+cl_stm8::context_restore(void)
+{
+  t_mem PCE;
+
+  pop1(regs.CC);
+  pop1(regs.A);
+  pop2(regs.X);
+  pop2(regs.Y);
+  pop1(PCE);
+  pop2(PC);
+  PC += (PCE << 16); //Add PCE to PC
+  tick(9);
+}
+
 int
 cl_stm8::accept_it(class it_level *il)
 {
-  //class cl_it_src *is= il->source;
-  push2( PC & 0xffff);
-  push1( PC >> 16); //extended PC
-  push2( regs.Y);
-  push2( regs.X);
-  push1( regs.A);
-  push1( regs.CC);
-  // set I1 and I0 status bits
-  if (il->level == 0)
-    { FLAG_SET(BIT_I1) FLAG_CLEAR(BIT_I0) }
-  else if (il->level == 1)
-    { FLAG_CLEAR(BIT_I1) FLAG_SET(BIT_I0) }
-  else if (il->level == 2)
-    { FLAG_CLEAR(BIT_I1) FLAG_CLEAR(BIT_I0) }
-  else // 3
-    { FLAG_SET(BIT_I1) FLAG_SET(BIT_I0) }
-  PC = il->addr;
+  // If we have an interrupt to handle go ahead now.
+  if (il)
+    {
+      // If we were halted we need to wake up now.
+      if (state == stPD)
+        clk->restart_after_halt();
 
-  it_levels->push(il);
+      // RM0016 1.2.1: The WFI/HALT instructions save the context in advance. If an
+      // interrupt occurs while the CPU is in one of these modes, the latency is reduced.
+      if (state != stIDLE && state != stPD)
+        context_save();
+
+      il->state = state;
+      state = stGO;
+
+      // set I1 and I0 status bits
+      if (il->level == 0)
+        { FLAG_SET(BIT_I1) FLAG_CLEAR(BIT_I0) }
+      else if (il->level == 1)
+        { FLAG_CLEAR(BIT_I1) FLAG_SET(BIT_I0) }
+      else if (il->level == 2)
+        { FLAG_CLEAR(BIT_I1) FLAG_CLEAR(BIT_I0) }
+      else // 3
+        { FLAG_SET(BIT_I1) FLAG_SET(BIT_I0) }
+
+      PC = il->addr;
+      // FIXME: do we need to tick here to account for fetches of the interrupt vector
+      // and/or pipeline flushes?
+
+      it_levels->push(il);
+    }
+
   return resGO;//resINTERRUPT;
 }
 

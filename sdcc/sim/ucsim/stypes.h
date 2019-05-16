@@ -265,7 +265,9 @@ enum cpu_state {
   stUNDEF	= -1,	/* Not defined or unknown */
   stGO		= 0,	/* Normal state */
   stIDLE	= 1,	/* Idle mode is active */
-  stPD		= 2	/* Power Down mode is active */
+  stWAIT	= 2,	/* Waiting for an external event */
+  stPD		= 3,	/* Power Down mode is active */
+  stSTALL	= 4	/* Stalled waiting for some action to complete */
 };
 
 /* Result of instruction simulation */

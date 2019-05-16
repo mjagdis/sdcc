@@ -103,6 +103,7 @@ class it_level: public cl_base
 public:
   int level;
   uint addr;
+  enum cpu_state state;
   uint PC;
   class cl_it_src *source;
 public:
