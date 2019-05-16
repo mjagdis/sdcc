@@ -2626,6 +2626,18 @@ cl_uc::stop_when(class cl_time_measurer *t)
  *----------------------------------------------------------------------------
  */
 
+cl_errata::cl_errata(const char *amsg)
+{
+  msg= amsg;
+  classification= uc_error_registry.find("errata");
+}
+
+void
+cl_errata::print(class cl_commander_base *c)
+{
+  c->dd_printf("ERRATA: %s\n", msg);
+}
+
 cl_error_timer_expired::cl_error_timer_expired(class cl_uc *auc, int anr)
 {
   uc= auc;
@@ -2680,6 +2692,7 @@ cl_uc_error_registry::cl_uc_error_registry(void)
 {
   class cl_error_class *prev = uc_error_registry.find("non-classified");
   register_error(new cl_error_class(err_error, "unknown_code", prev, ERROR_OFF));
+  register_error(new cl_error_class(err_warning, "errata", prev, ERROR_ON));
   register_error(new cl_error_class(err_warning, "timer_expired", prev, ERROR_ON));
 }
 

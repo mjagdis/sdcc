@@ -133,6 +133,7 @@ class cl_saf_flash: public cl_flash
  public:
   cl_saf_flash(class cl_uc *auc, t_addr abase);
   virtual void halt(void);
+  virtual void wakeup(void);
   virtual void registration(void);
 };
 

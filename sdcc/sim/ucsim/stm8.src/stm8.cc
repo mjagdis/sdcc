@@ -796,14 +796,6 @@ cl_stm8::make_memories(void)
   v->init();
   vars->add(v= new cl_var(cchars("SP"), regs16, 2, "", 15, 0));
   v->init();
-
-  cfg_gcr= rom->get_cell(0x7f60);
-  vars->add(v= new cl_var(cchars("CFG_GCR"), rom, 0x7f60, "", 7, 0));
-  v->init();
-  vars->add(v= new cl_var(cchars("CFG_GCR_AL"), rom, 0x7f60, "", 1, 1));
-  v->init();
-  vars->add(v= new cl_var(cchars("CFG_GCR_SWD"), rom, 0x7f60, "", 0, 0));
-  v->init();
 }
 
 
@@ -1573,10 +1565,29 @@ cl_stm8::exec_inst(void)
                          state = il->state;
                        }
                      else
-                       context_restore();
+                       {
+                         static bool notified = false;
+                         if (!notified && il->state == stPD)
+                           {
+                             notified = true;
+                             error(new cl_errata("Activation level (AL bit) not functional in Halt mode."));
+                           }
+                         context_restore();
+                       }
                    }
                  else
-                   context_restore();
+                   {
+                     static bool notified = false;
+                     if (!notified && vc.inst - cfg_gcr_last_disable < 2)
+                       {
+                         notified = true;
+                         // This is not mentioned in the erratas for STM8Sx05 and STM8AF62xx but is
+                         // for all other variants. It is unknown as to whether these particular chips
+                         // are unaffected or their erratas are incomplete.
+                         error(new cl_errata("Reset the activation level (AL bit) at least two instructions before the IRET."));
+                       }
+                     context_restore();
+                   }
 
                  if (il->level >= 0)
                    delete (class it_level *)(it_levels->pop());
@@ -2521,6 +2532,19 @@ cl_stm8_cpu::init(void)
     {
       regs[i]= register_cell(uc->rom, 0x7f00+i);
     }
+
+  class cl_var *v;
+  uc->vars->add(v= new cl_var(cchars("CFG_GCR"), uc->rom, 0x7f60, "", 7, 0));
+  v->init();
+  uc->vars->add(v= new cl_var(cchars("CFG_GCR_AL"), uc->rom, 0x7f60, "", 1, 1));
+  v->init();
+  uc->vars->add(v= new cl_var(cchars("CFG_GCR_SWD"), uc->rom, 0x7f60, "", 0, 0));
+  v->init();
+
+  class cl_stm8 *stm8= (cl_stm8 *)uc;
+  stm8->cfg_gcr= register_cell(uc->rom, 0x7f60);
+  stm8->cfg_gcr_last_disable= 0;
+
   return 0;
 }
 
@@ -2539,6 +2563,13 @@ cl_stm8_cpu::write(class cl_memory_cell *cell, t_mem *val)
   *val&= 0xff;
   if (!uc->rom->is_owned(cell, &a))
     return;  
+
+  if (cell == u->cfg_gcr)
+    {
+      if ((u->cfg_gcr->get() & 0x02) && !(*val & 0x02))
+        u->cfg_gcr_last_disable= u->vc.inst;
+    }
+
   if ((a < 0x7f00) ||
       (a > 0x7f0a))
     return;

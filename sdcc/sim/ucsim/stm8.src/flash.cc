@@ -697,6 +697,19 @@ cl_saf_flash::halt(void)
     }
 }
 
+void
+cl_saf_flash::wakeup(void)
+{
+  static bool notified = false;
+  if (!notified && uc->xtal / uc->clock_per_cycle() > 250000)
+    {
+      notified = true;
+      uc->error(new cl_errata("Reduce f_CPU to 250kHz or lower to ensure correct Flash memory wakeup."));
+    }
+
+  cl_flash::wakeup();
+}
+
 
 /* L101 */
 
@@ -798,6 +811,13 @@ cl_l_flash::wait(void)
 void
 cl_l_flash::wakeup(void)
 {
+  static bool notified = false;
+  if (!notified && uc->xtal / uc->clock_per_cycle() > 8000000)
+    {
+      notified = true;
+      uc->error(new cl_errata("Reduce f_CPU to 8MHz or lower to ensure correct Flash memory wakeup."));
+    }
+
   cl_flash::wakeup();
 
   // RM0031 3.9.1: EEPM is cleared by hardware just after a FLash or data EEPROM
