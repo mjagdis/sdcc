@@ -195,9 +195,9 @@ cl_memory::var_for(t_addr addr, int bitnr_high, int bitnr_low, t_index &var_i)
 }
 
 t_addr
-cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_low, int bpl, class cl_f *f)
+cl_memory::dump(class cl_console_base *con, int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_low, int bpl)
 {
-  if (!f)
+  if (!con)
     return dump_finished;
 
   if (!is_address_space())
@@ -260,19 +260,19 @@ cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_
       int n;
 
       if (smart && this != uc->rom)
-        f->prntf("%s[", get_name("?"));
-      f->prntf(addr_format, start);
+        con->dd_printf("%s[", get_name("?"));
+      con->dd_printf(addr_format, start);
       if (smart && this != uc->rom)
-        f->write_str("]");
+        con->dd_printf("]");
 
       if (smart)
         {
           if (bitnr_high >= 0 && bitnr_high == bitnr_low)
-            f->prntf(".%d   ", bitnr_high);
+            con->dd_printf(".%d   ", bitnr_high);
           else if (bitnr_low > 0 || (bitnr_high > 0 && bitnr_high < width - 1))
-            f->prntf("[%d:%d]", bitnr_high, bitnr_low);
+            con->dd_printf("[%d:%d]", bitnr_high, bitnr_low);
           else if (smart == 2)
-            f->write_str("     ");
+            con->dd_printf("     ");
 
           if (var)
             {
@@ -283,14 +283,14 @@ cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_
                    (var->bitnr_high == width - 1 && var->bitnr_low == 0)))
                 {
                   if (bitnr_high >= 0 && bitnr_high == bitnr_low)
-                    f->prntf(" %s.%d:   %*s", var->get_name(), bitnr_high, label_width - strlen(var->get_name()), "");
+                    con->dd_printf(" %s.%d:   %*s", var->get_name(), bitnr_high, label_width - strlen(var->get_name()), "");
                   else if (bitnr_low > 0 || (bitnr_high > 0 && bitnr_high < width - 1))
-                    f->prntf(" %s[%d:%d]:%*s", var->get_name(), bitnr_high, bitnr_low, label_width - strlen(var->get_name()), "");
+                    con->dd_printf(" %s[%d:%d]:%*s", var->get_name(), bitnr_high, bitnr_low, label_width - strlen(var->get_name()), "");
                   else
-                    f->prntf(" %s:%*s", var->get_name(), label_width - strlen(var->get_name()) + (smart == 2 ? 5 : 0), "");
+                    con->dd_printf(" %s:%*s", var->get_name(), label_width - strlen(var->get_name()) + (smart == 2 ? 5 : 0), "");
                 }
               else
-                f->prntf(" %s:%*s", var->get_name(), label_width - strlen(var->get_name()) + (smart == 2 ? 5 : 0), "");
+                con->dd_printf(" %s:%*s", var->get_name(), label_width - strlen(var->get_name()) + (smart == 2 ? 5 : 0), "");
 
               // If the next var matches we do not need to output data now.
               if (++var_i < uc->vars->by_addr.count)
@@ -301,7 +301,7 @@ cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_
                       ((var_next->bitnr_high == bitnr_high && var_next->bitnr_low == bitnr_low) ||
                        (bitnr_high < 0 && var_next->bitnr_high == width - 1 && var_next->bitnr_low == 0)))
                     {
-                      f->write_str("\n");
+                      con->dd_printf("\n");
                       if (lines > 0)
                         lines--;
                       var = var_next;
@@ -311,7 +311,7 @@ cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_
                 }
             }
           else
-            f->prntf(" %-*s %s", label_width, "", (smart == 2 ? "     " : ""));
+            con->dd_printf(" %-*s %s", label_width, "", (smart == 2 ? "     " : ""));
 
           if (smart == 2 || (var && var->bitnr_high >= 0))
             {
@@ -327,36 +327,36 @@ cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_
               else
                 b_high = width - 1, b_low = 0;
 
-              f->write_str(" ");
+              con->dd_printf(" ");
 
               t_mem m= read(start);
 
               int i;
-              f->write_str("0b");
+              con->dd_printf("0b");
               for (i= width - 1; i > b_high; i--)
-                f->write_str("-");
+                con->dd_printf("-");
               for (; i >= b_low; i--)
-                f->prntf("%c", (m & (1U << i)) ? '1' : '0');
+                con->dd_printf("%c", (m & (1U << i)) ? '1' : '0');
               for (; i >= 0; i--)
-                f->write_str("-");
+                con->dd_printf("-");
 
               int nbits = b_high - b_low + 1;
 
               m = (m >> b_low) & ((1U << nbits) - 1);
 
-              f->prntf(" 0x%0*x", (nbits > 16 ? 8 : (nbits > 8 ? 4 : 2)), m);
+              con->dd_printf(" 0x%0*x", (nbits > 16 ? 8 : (nbits > 8 ? 4 : 2)), m);
 
-              f->write_str(" '");
+              con->dd_printf(" '");
               for (int i= (nbits - 1) - ((nbits - 1) % 8); i >= 0; i -= 8)
-                f->prntf("%c", (isprint(m >> i) ? m >> i : '.'));
-              f->write_str("'");
+                con->dd_printf("%c", (isprint(m >> i) ? m >> i : '.'));
+              con->dd_printf("'");
 
-              f->prntf(" %*u", (nbits > 16 ? 10 : (nbits > 8 ? 5 : 3)), m);
+              con->dd_printf(" %*u", (nbits > 16 ? 10 : (nbits > 8 ? 5 : 3)), m);
 
               if ((m & (1U << (nbits - 1))))
-                f->prntf(" (%*d)", (nbits > 16 ? 10 : (nbits > 8 ? 5 : 3)), 0 - ((1U << nbits) - m));
+                con->dd_printf(" (%*d)", (nbits > 16 ? 10 : (nbits > 8 ? 5 : 3)), 0 - ((1U << nbits) - m));
 
-              f->write_str("\n");
+              con->dd_printf("\n");
               if (lines > 0)
                 lines--;
 
@@ -389,46 +389,69 @@ cl_memory::dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_
             ; // Not bit-formatted so drop through to normal output.
         }
 
-      f->write_str(" ");
+      con->dd_printf(" ");
 
-      for (n= 0;
-           (n < bpl) &&
-             (start+n*step >= lva) &&
-             (start+n*step <= hva) &&
-             (start+n*step != stop);
-           n++)
+      if (smart && step > 0 && this == uc->rom && uc->inst_at(start))
         {
-          if (smart && n)
+          n= uc->inst_length(start);
+          for (int i= 0; i < n; i++)
             {
-              var= var_for(start+n*step, bitnr_high, bitnr_low, var_i);
-              if (var)
-                break;
+              con->dd_printf(data_format, get(start+i*step));
+              con->dd_printf(" ");
             }
-          f->prntf(data_format, get(start+n*step)); f->write_str(" ");
+          var= var_for(start+n*step, bitnr_high, bitnr_low, var_i);
+        }
+      else
+        {
+          for (n= 0;
+               (n < bpl) &&
+                 (start+n*step >= lva) &&
+                 (start+n*step <= hva) &&
+                 (start+n*step != stop);
+               n++)
+            {
+              if (smart && n)
+                {
+                  var= var_for(start+n*step, bitnr_high, bitnr_low, var_i);
+                  if (var)
+                    break;
+                  if (step > 0 && this == uc->rom && uc->inst_at(start+n*step))
+                    break;
+                }
+              con->dd_printf(data_format, get(start+n*step));
+              con->dd_printf(" ");
+            }
         }
       for (i= n; i < bpl; i++)
         {
           for (int j= width/4 + ((width%4)?1:0) + 1; j; j--)
-            f->write_str(" ");
+            con->dd_printf(" ");
         }
       if (!smart && n)
-        f->write_str(" ");
-      for (i= 0; i < n &&
-             start+i*step >= lva &&
-             start+i*step <= hva &&
-             start+i*step != stop;
-           i++)
+        con->dd_printf(" ");
+      if (smart && step > 0 && this == uc->rom && uc->inst_at(start))
         {
-          long c= read(start+i*step);
-          f->prntf("%c", isprint(255&c)?(255&c):'.');
-          if (width > 8)
-            f->prntf("%c", isprint(255&(c>>8))?(255&(c>>8)):'.');
-          if (width > 16)
-            f->prntf("%c", isprint(255&(c>>16))?(255&(c>>16)):'.');
-          if (width > 24)
-            f->prntf("%c", isprint(255&(c>>24))?(255&(c>>24)):'.');
+          uc->disass(con, start, NULL);
         }
-      f->prntf("\n");
+      else
+        {
+          for (i= 0; i < n &&
+                 start+i*step >= lva &&
+                 start+i*step <= hva &&
+                 start+i*step != stop;
+               i++)
+            {
+              long c= read(start+i*step);
+              con->dd_printf("%c", isprint(255&c)?(255&c):'.');
+              if (width > 8)
+                con->dd_printf("%c", isprint(255&(c>>8))?(255&(c>>8)):'.');
+              if (width > 16)
+                con->dd_printf("%c", isprint(255&(c>>16))?(255&(c>>16)):'.');
+              if (width > 24)
+                con->dd_printf("%c", isprint(255&(c>>24))?(255&(c>>24)):'.');
+            }
+        }
+      con->dd_printf("\n");
 
       start+= n*step;
       dump_finished= start;
@@ -2626,7 +2649,7 @@ cl_decoder_list::key_of(void *item)
 }
 
 int
-cl_decoder_list::compare(void *key1, void *key2)
+cl_decoder_list::compare(const void *key1, const void *key2)
 {
   t_addr k1= *((t_addr*)key1), k2= *((t_addr*)key2);
   if (k1 == k2)

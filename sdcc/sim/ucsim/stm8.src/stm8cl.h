@@ -41,6 +41,10 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 class cl_stm8: public cl_uc
 {
+private:
+  unsigned int func_index;
+  unsigned int label_index;
+  unsigned int loop_index;
 public:
   class cl_address_space *ram;
   class cl_address_space *regs8;
@@ -73,6 +77,7 @@ public:
   virtual int inst_length(t_addr addr);
   virtual int inst_branch(t_addr addr);
   virtual int longest_inst(void);
+  virtual void analyze(t_addr addr);
   virtual void disass(class cl_console_base *con, t_addr addr, const char *sep);
   virtual void print_regs(class cl_console_base *con);
 

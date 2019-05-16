@@ -95,17 +95,19 @@ public:
   virtual void err_non_decoded(t_addr addr);
 
   virtual class cl_var *var_for(t_addr addr, int bitnr_high, int bitnr_low, t_index &var_i);
-  virtual t_addr dump(int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_low, int bpl, class cl_f *f);
-  virtual t_addr dump(int smart, t_addr start, t_addr stop, int bpl, class cl_f *f) {
-    return dump(smart, start, stop, -1, -1, bpl, f);
+  virtual t_addr dump(class cl_console_base *con, int smart, t_addr start, t_addr stop, int bitnr_high, int bitnr_low, int bpl);
+  virtual t_addr dump(class cl_console_base *con, int smart, t_addr start, t_addr stop, int bpl) {
+    return dump(con, smart, start, stop, -1, -1, bpl);
   }
-  virtual t_addr dump(t_addr addr, int bitnr_high, int bitnr_low, class cl_f *f) {
-    return dump(2, addr, addr, bitnr_high, bitnr_low, -1, f);
+  virtual t_addr dump(class cl_console_base *con, t_addr addr, int bitnr_high, int bitnr_low) {
+    return dump(con, 2, addr, addr, bitnr_high, bitnr_low, -1);
+  }
+  virtual t_addr dump(class cl_console_base *con, t_addr start, t_addr stop, int bpl) {
+    return dump(con, 1, start, stop, bpl);
   }
   virtual t_addr dump_s(t_addr start, t_addr stop, int bpl, class cl_f *f);
   virtual t_addr dump_b(t_addr start, t_addr stop, int bpl, class cl_f *f);
   virtual t_addr dump_i(t_addr start, t_addr stop, int bpl, class cl_f *f);
-  virtual t_addr dump(t_addr start, t_addr stop, int bpl, class cl_f *f) { return dump(1, start, stop, bpl, f); }
   //virtual t_addr dump(class cl_f *f) { return(dump(df_smart, -1, -1, -1, f)); }
   virtual bool search_next(bool case_sensitive,
 			   t_mem *array, int len, t_addr *addr);
@@ -569,7 +571,7 @@ public:
   cl_decoder_list(t_index alimit, t_index adelta, bool bychip);
 
   virtual void *key_of(void *item);
-  virtual int compare(void *key1, void *key2);
+  virtual int compare(const void *key1, const void *key2);
 };
 
 

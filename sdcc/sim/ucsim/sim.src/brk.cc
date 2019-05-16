@@ -184,7 +184,7 @@ brk_coll::key_of(void *item)
 
 
 int
-brk_coll::compare(void *key1, void *key2)
+brk_coll::compare(const void *key1, const void *key2)
 {
   int k1, k2;
 

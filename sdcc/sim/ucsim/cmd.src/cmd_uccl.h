@@ -53,6 +53,7 @@ COMMAND_TAIL;
 COMMAND_DATA_ANCESTOR_ON(uc,cl_Where_cmd,cl_where_cmd,int last);
 
   COMMAND_ON(uc,cl_var_cmd);
+  COMMAND_ON(uc,cl_analyze_cmd);
   
 #endif
 

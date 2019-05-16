@@ -65,7 +65,7 @@ class cl_var_by_name_list: public cl_sorted_list
 
   virtual class cl_var *at(t_index index) { return (cl_var *)cl_sorted_list::at(index); }
   virtual void *key_of(void *item);
-  virtual int compare(void *key1, void *key2);
+  virtual int compare(const void *key1, const void *key2);
 };
 
 class cl_var_by_addr_list: public cl_sorted_list
@@ -76,7 +76,7 @@ class cl_var_by_addr_list: public cl_sorted_list
 
   virtual class cl_var *at(t_index index) { return (cl_var *)cl_sorted_list::at(index); }
   virtual int compare_addr(class cl_var *var, class cl_memory *mem, t_addr addr, int bitnr_high, int bitnr_low);
-  virtual int compare(void *key1, void *key2);
+  virtual int compare(const void *key1, const void *key2);
   virtual bool search(class cl_memory *mem, t_addr addr, int bitnr_high, int bitnr_low, t_index &index);
 };
 
@@ -91,7 +91,8 @@ class cl_var_list: public cl_base
   cl_var_list() {}
 
   virtual void add(cl_var *item);
-  virtual int get_max_name_len(void) { return max_name_len; }
+  virtual void del(const char *name);
+  virtual int get_max_name_len(void);
 };
 
 

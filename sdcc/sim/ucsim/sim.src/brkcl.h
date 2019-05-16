@@ -120,7 +120,7 @@ public:
 public:
   brk_coll(t_index alimit, t_index adelta, class cl_address_space/*rom*/*arom);
   virtual void *key_of(void *item);
-  virtual int  compare(void *key1, void *key2);
+  virtual int  compare(const void *key1, const void *key2);
 
   virtual bool there_is_event(enum brk_event ev);
   //virtual int make_new_nr(void);

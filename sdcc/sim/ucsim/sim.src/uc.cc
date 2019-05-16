@@ -628,6 +628,7 @@ cl_uc::build_cmdset(class cl_cmdset *cmdset)
 
   cmdset->add(cmd= new cl_dump_cmd("dump", true));
   cmd->init();
+  cmd->add_name("d");
 
   cmdset->add(cmd= new cl_dch_cmd("dch", true));
   cmd->init();
@@ -852,6 +853,9 @@ cl_uc::build_cmdset(class cl_cmdset *cmdset)
   cmdset->add(cmd= new cl_var_cmd("var", 0));
   cmd->init();
   cmd->add_name("variable");
+
+  cmdset->add(cmd= new cl_analyze_cmd("analyze", 0));
+  cmd->init();
 }
 
 

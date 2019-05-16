@@ -180,12 +180,12 @@ public:
   cl_sorted_list(t_index alimit, t_index adelta, const char *aname);
   virtual ~cl_sorted_list(void);
   
-  virtual bool	   search(void *key, t_index& index);
+  virtual bool	   search(const void *key, t_index& index);
   virtual t_index  index_of(void *item);
   virtual t_index  add(void *item);
   virtual void	   *key_of(void *item);
 private:
-  virtual int	   compare(void *key1, void *key2)= 0;
+  virtual int	   compare(const void *key1, const void *key2)= 0;
 };
 
 
@@ -204,7 +204,7 @@ public:
   virtual ~cl_strings(void);
   
 private:
-  virtual int	   compare(void *key1, void *key2);
+  virtual int	   compare(const void *key1, const void *key2);
   virtual void	   free_item(void *item);
 };
 
@@ -224,7 +224,7 @@ public:
   virtual ~cl_ustrings(void);
   
 private:
-  virtual int	   compare(void *key1, void *key2);
+  virtual int	   compare(const void *key1, const void *key2);
   virtual bool	   search(void *key, t_index &index);
 };
 

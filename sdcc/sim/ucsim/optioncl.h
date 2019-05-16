@@ -107,7 +107,7 @@ class cl_options: public cl_sorted_list
  cl_options(void): cl_sorted_list(2, 2, cchars("options"))
     { Duplicates= true; }
   virtual void *key_of(void *item);
-  virtual int compare(void *key1, void *key2);
+  virtual int compare(const void *key1, const void *key2);
   virtual void new_option(class cl_option *opt);
   virtual void del_option(class cl_option *opt);
   virtual class cl_option *get_option(const char *the_name);

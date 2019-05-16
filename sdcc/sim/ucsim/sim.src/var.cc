@@ -112,14 +112,10 @@ cl_var_by_name_list::key_of(void *item)
 }
 
 int
-cl_var_by_name_list::compare(void *key1, void *key2)
+cl_var_by_name_list::compare(const void *key1, const void *key2)
 {
-  char *k1, *k2;
-
-  k1= (char*)key1;
-  k2= (char*)key2;
-  if (k1 && k2)
-    return strcmp(k1, k2);
+  if (key1 && key2)
+    return strcmp((const char *)key1, (const char *)key2);
   return 0;
 }
 
@@ -150,7 +146,7 @@ cl_var_by_addr_list::compare_addr(class cl_var *var, class cl_memory *mem, t_add
 }
 
 int
-cl_var_by_addr_list::compare(void *key1, void *key2)
+cl_var_by_addr_list::compare(const void *key1, const void *key2)
 {
   class cl_var *k1 = (cl_var *)key1;
   class cl_var *k2 = (cl_var *)key2;
@@ -196,15 +192,99 @@ cl_var_list::add(cl_var *item)
 {
   const char *name = item->get_name();
 
-  if (name)
+  if (name && max_name_len >= 0)
     {
       int l = strlen(name);
-      if (l > max_name_len)
-        max_name_len = l;
+      if (l < max_name_len)
+        l = max_name_len;
+
+      del(name);
+      max_name_len = l;
+    }
+
+  // If analyze put a variable at this location in the past it is no
+  // longer needed and can be removed.
+  t_index i;
+  if (by_addr.search(item->mem, item->addr, item->bitnr_high, item->bitnr_low, i))
+    {
+      class cl_var *v;
+      while (i < by_addr.count && (v = by_addr.at(i)) &&
+             v->mem == item->mem && v->addr == item->addr &&
+             v->bitnr_high == item->bitnr_high && v->bitnr_low == item->bitnr_low)
+        {
+          if (!strcmp(v->desc, "[analyze]"))
+            {
+              by_addr.disconn_at(i);
+
+              t_index j;
+              if (by_name.search(v->get_name(), j))
+                by_name.disconn_at(j);
+
+              if ((int)strlen(v->get_name()) == max_name_len)
+                max_name_len = -1;
+
+              delete v;
+
+              // There should be at most 1.
+              break;
+            }
+          else
+            i++;
+        }
     }
 
   by_name.add(item);
   by_addr.add(item);
+}
+
+void
+cl_var_list::del(const char *name)
+{
+  t_index i;
+
+  if (by_name.search((char *)name, i))
+    {
+      class cl_var *v = (class cl_var *)(by_name.at(i));
+      by_name.disconn_at(i);
+
+      if (by_addr.search(v->mem, v->addr, v->bitnr_high, v->bitnr_low, i))
+        {
+          class cl_var *v2;
+          while (i < by_addr.count && (v2 = by_addr.at(i)) &&
+                 v2->mem == v->mem && v2->addr == v->addr &&
+                 v2->bitnr_high == v->bitnr_high && v2->bitnr_low == v->bitnr_low)
+            {
+              if (!strcmp(v2->get_name(), name))
+                {
+                  by_addr.disconn_at(i);
+                  break;
+                }
+              else
+                i++;
+            }
+        }
+
+      if ((int)strlen(v->get_name()) == max_name_len)
+        max_name_len = -1;
+
+      delete v;
+    }
+}
+
+int
+cl_var_list::get_max_name_len(void)
+{
+  if (max_name_len < 0)
+    {
+      for (t_index i = 0; i < by_name.count; i++)
+        {
+          int l = strlen(by_name.at(i)->get_name());
+          if (l > max_name_len)
+            max_name_len = l;
+        }
+    }
+
+  return max_name_len;
 }
 
 

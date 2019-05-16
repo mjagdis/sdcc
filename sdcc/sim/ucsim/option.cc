@@ -230,17 +230,9 @@ cl_options::key_of(void *item)
 }
 
 int
-cl_options::compare(void *key1, void *key2)
+cl_options::compare(const void *key1, const void *key2)
 {
-  //class cl_option *k1, *k2;
-  int i;
-  char *k1, *k2;
-
-  k1= /*(class cl_option *)*/(char *)key1;
-  k2= /*(class cl_option *)*/(char *)key2;
-  if ((i= strcmp(k1, k2)) != 0)
-    return(i);
-  return(i);
+  return strcmp((const char *)key1, (const char *)key2);
 }
 
 void
@@ -279,27 +271,27 @@ cl_options::get_option(const char *the_name, class cl_base *creator)
     {
       idx--;
       o= (class cl_option *)(at(idx));
-      while (compare((void*)the_name, key_of(o)) == 0 &&
+      while (compare(the_name, key_of(o)) == 0 &&
 	     idx > 0)
 	{
 	  idx--;
 	  o= (class cl_option *)(at(idx));
 	}
-      if (compare((void*)the_name, key_of(o)) != 0)
+      if (compare(the_name, key_of(o)) != 0)
 	idx++;
     }
   o= (class cl_option *)(at(idx));
-  while (compare((void*)the_name, key_of(o)) == 0 &&
+  while (compare(the_name, key_of(o)) == 0 &&
 	 o->get_creator() != creator &&
 	 idx < count)
     {
       idx++;
       o= (class cl_option *)(at(idx));
-      if (compare((void*)the_name, key_of(o)) == 0 &&
+      if (compare(the_name, key_of(o)) == 0 &&
 	  o->get_creator() == creator)
 	return(o);
     }
-  if (compare((void*)the_name, key_of(o)) == 0 &&
+  if (compare(the_name, key_of(o)) == 0 &&
       o->get_creator() == creator)
     return(o);
   return(0);
@@ -317,27 +309,27 @@ cl_options::get_option(const char *the_name, char *creator)
     {
       idx--;
       o= (class cl_option *)(at(idx));
-      while (compare((void*)the_name, key_of(o)) == 0 &&
+      while (compare(the_name, key_of(o)) == 0 &&
 	     idx > 0)
 	{
 	  idx--;
 	  o= (class cl_option *)(at(idx));
 	}
-      if (compare((void*)the_name, key_of(o)) != 0)
+      if (compare(the_name, key_of(o)) != 0)
 	idx++;
     }
   o= (class cl_option *)(at(idx));
-  while (compare((void*)the_name, key_of(o)) == 0 &&
+  while (compare(the_name, key_of(o)) == 0 &&
 	 strcmp(object_name(o->get_creator()), creator) != 0 &&
 	 idx < count)
     {
       idx++;
       o= (class cl_option *)(at(idx));
-      if (compare((void*)the_name, key_of(o)) == 0 &&
+      if (compare(the_name, key_of(o)) == 0 &&
 	  strcmp(object_name(o->get_creator()), creator) == 0)
 	return(o);
     }
-  if (compare((void*)the_name, key_of(o)) == 0 &&
+  if (compare(the_name, key_of(o)) == 0 &&
       strcmp(object_name(o->get_creator()), creator) == 0)
     return(o);
   return(0);

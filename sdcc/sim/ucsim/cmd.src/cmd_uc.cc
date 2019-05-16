@@ -208,7 +208,7 @@ CMDHELP(cl_reset_cmd,
 //		     class cl_cmdline *cmdline, class cl_console *con)
 COMMAND_DO_WORK_UC(cl_dump_cmd)
 {
-  class cl_memory *mem= 0;
+  class cl_memory *mem= uc->rom;
   t_addr start = -1, end = -1;
   long bpl= 8;
 
@@ -263,10 +263,10 @@ COMMAND_DO_WORK_UC(cl_dump_cmd)
 	     params[0]->as_bit(uc))
 	{
           if (!fmt)
-	    params[0]->value.bit.mem->dump(params[0]->value.bit.mem_address,
+	    params[0]->value.bit.mem->dump(con,
+                                           params[0]->value.bit.mem_address,
                                            params[0]->value.bit.bitnr_high,
-                                           params[0]->value.bit.bitnr_low,
-                                           con->get_fout());
+                                           params[0]->value.bit.bitnr_low);
           else
             con->dd_printf("Format options may not be specified for bits\n");
 
@@ -277,7 +277,7 @@ COMMAND_DO_WORK_UC(cl_dump_cmd)
 	syntax_error(con);
       return false;
     }
-  
+
   if (params[0] == 0)
     ;
   else if (cmdline->syntax_match(uc, BIT)) {
@@ -329,13 +329,13 @@ COMMAND_DO_WORK_UC(cl_dump_cmd)
   switch (fmt)
     {
       case 0: // default
-        mem->dump(1, start, end, bpl, con->get_fout());
+        mem->dump(con, 1, start, end, bpl);
         break;
       case 'b': // binary
         mem->dump_b(start, end, bpl, con->get_fout());
         break;
       case 'h': // hex
-        mem->dump(0, start, end, bpl, con->get_fout());
+        mem->dump(con, 0, start, end, bpl);
         break;
       case 'i': // ihex
         mem->dump_i(start, end, 32, con->get_fout());
@@ -645,7 +645,7 @@ cl_where_cmd::do_real_work(class cl_uc *uc,
     bool found= mem->search_next(case_sensitive, array, len, &addr);
     while (found)
       {
-	mem->dump(0, addr, addr+len-1, -1, con->get_fout());
+	mem->dump(con, 0, addr, addr+len-1, -1);
 	addr++;
 	found= mem->search_next(case_sensitive, array, len, &addr);
       }
@@ -713,6 +713,26 @@ COMMAND_DO_WORK_UC(cl_var_cmd)
       m= params[1]->value.memory.memory;
       addr= params[2]->value.address;
     }
+  else if (cmdline->syntax_match(uc, STRING STRING))
+    {
+      t_index i;
+
+      if (uc->vars->by_name.search(params[1]->value.string.string, i))
+        {
+          class cl_var *v = uc->vars->by_name.at(i);
+
+          v= new cl_var(params[0]->value.string.string, v->mem, v->addr, chars(""), v->bitnr_high, v->bitnr_low);
+          v->init();
+          uc->vars->add(v);
+
+          uc->vars->del(params[1]->value.string.string);
+
+          return false;
+        }
+      else
+        return con->dd_printf("%s is not a known variable\n", params[1]->value.string.string),
+	  false;
+    }
   else if (cmdline->syntax_match(uc, STRING BIT))
     {
       m= params[1]->value.bit.mem;
@@ -726,14 +746,12 @@ COMMAND_DO_WORK_UC(cl_var_cmd)
     }
   else if (cmdline->syntax_match(uc, STRING))
     {
+      uc->vars->del(params[0]->value.string.string);
+      return false;
     }
   else
     return syntax_error(con), false;
 
-  if (!valid_sym_name(params[0]->value.string.string))
-    return con->dd_printf("name is invalid\n"),
-      false;
-  
   if (m)
     if (!m->is_address_space())
       return con->dd_printf("%s is not address space\n", m->get_name()),
@@ -747,10 +765,6 @@ COMMAND_DO_WORK_UC(cl_var_cmd)
     return con->dd_printf("max bit number is %d\n", (int)sizeof(t_mem)*8),
       false;
 
-  if (uc->symbol2address(params[0]->value.string.string, NULL, NULL))
-    return con->dd_printf("already exists\n"),
-      false;
-  
   if (m)
     {
       v= new cl_var(params[0]->value.string.string, m, addr, chars(""), bitnr_high, bitnr_low);
@@ -787,5 +801,39 @@ CMDHELP(cl_var_cmd,
 	"var name [memory addr [bit_nr]]",
 	"Create new variable",
 	"long help of var")
+
+COMMAND_DO_WORK_UC(cl_analyze_cmd)
+{
+  if (cmdline->nuof_params() == 0)
+    uc->analyze(0);
+  else
+    for (int i = 0; i < cmdline->nuof_params(); i++)
+      {
+        class cl_cmd_arg *param = cmdline->param(i);
+        if (param)
+          {
+            if (param->as_bit(uc))
+              {
+                if (param->value.bit.mem == uc->rom)
+                  uc->analyze(param->value.bit.mem_address);
+                else
+                  {
+                    con->dd_printf("%s[", param->value.bit.mem->get_name());
+                    con->dd_printf(param->value.bit.mem->addr_format, param->value.bit.mem_address);
+                    con->dd_printf("]: addresses to analyze must be in %s\n", uc->rom->get_name());
+                  }
+              }
+            else
+              con->dd_printf("%s cannot be interpreted as a rom address\n", cmdline->tokens->at(i));
+          }
+      }
+
+  return false;
+}
+
+CMDHELP(cl_analyze_cmd,
+	"analyze [addr...]",
+	"Analyze reachable code globally or from the address(es) given",
+	"long help of analyze")
 
 /* End of cmd.src/cmd_uc.cc */

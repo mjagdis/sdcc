@@ -941,6 +941,241 @@ cl_stm8::get_disasm_info(t_addr addr,
 }
 
 void
+cl_stm8::analyze(t_addr addr)
+{
+  char label[80];
+  class cl_var *v;
+  const char *mnemonic;
+  t_index i;
+  int length = 0, branch = 0, immed_offset = 0;
+  t_addr operand = 0;
+
+  // cl_uc::load_hex_file always fires off an analyze(0)
+  if (!addr)
+    {
+      // Forget everything we knew previously.
+      for (addr = rom->get_start_address(); addr < rom->highest_valid_address(); addr++)
+        del_inst_at(addr);
+
+      i = 0;
+      while (i < vars->by_name.count)
+        {
+          v = vars->by_name.at(i);
+          if (!strcmp(v->desc, "[analyze]"))
+            vars->del(v->get_name());
+          else
+            i++;
+        }
+      func_index = 1;
+      label_index = 1;
+      loop_index = 1;
+
+      for (i = 0; i < it_sources->count; i++)
+        {
+          class cl_it_src *is= (class cl_it_src *)(it_sources->at(i));
+
+          operand = (rom->get(is->addr+immed_offset+1)<<16) |
+                    (rom->get(is->addr+immed_offset+2)<<8) |
+                    (rom->get(is->addr+immed_offset+3));
+
+          t_index var_i;
+          if (rom->get(operand) != 0x80 && !vars->by_addr.search(rom, operand, -1, -1, var_i))
+            {
+              snprintf(label, sizeof(label)-1, ".isr_%s", is->get_name());
+              v = new cl_var(label, rom, operand, chars("[analyze]"), -1, -1);
+              v->init();
+              vars->add(v);
+            }
+        }
+
+      // We could also just iterate through the interrupt table and
+      // call analyze on each target address. But there's nothing
+      // to stop you using unused vector space for code. Of course,
+      // the unused vectors could also be totally unset in which
+      // case processing the vector table like this could stop
+      // prematurely. So we have to be fairly pedantic here.
+      for (addr = 0x8000; addr <= 0x807c; addr += 4)
+        if (rom->get(addr) == 0x82) // int
+          {
+            set_inst_at(addr);
+
+            operand = (rom->get(addr+immed_offset+1)<<16) |
+                      (rom->get(addr+immed_offset+2)<<8) |
+                      (rom->get(addr+immed_offset+3));
+
+            if (!vars->by_addr.search(rom, operand, -1, -1, i))
+              {
+                if (addr == 0x8000)
+                  snprintf(label, sizeof(label)-1, "%s", ".reset");
+                else if (rom->get(operand) == 0x80) // jumps straight to iret
+                  snprintf(label, sizeof(label)-1, "%s", ".isr_unused");
+                else if (addr == 0x8004)
+                  snprintf(label, sizeof(label)-1, "%s", ".trap");
+                else
+                  snprintf(label, sizeof(label)-1, "%s%lu", ".interrupt", ((unsigned long)addr - 0x8008) / 4);
+
+                v = new cl_var(label, rom, operand, chars("[analyze]"), -1, -1);
+                v->init();
+                vars->add(v);
+              }
+
+            analyze(operand);
+          }
+      // P.S. we can't do anything about left over ints in the
+      // interrupt table that haven't been cleared out.
+      return;
+    }
+
+  while (!inst_at(addr) && (mnemonic = get_disasm_info(addr, &length, &branch, &immed_offset, NULL)))
+    {
+      set_inst_at(addr);
+
+      if (branch == 'r' || branch == '!')
+        return;
+
+      const char *var_name = NULL;
+      const char *suffix = "";
+
+      for (const char *b = mnemonic; *b; b++)
+        {
+          if (b[0] == '%' && b[1])
+            {
+              b++;
+              switch (*b)
+                {
+                  case '3': // 3    24bit index offset
+                    ++immed_offset;
+                   // Fall through
+                  case '2': // 2    word index offset
+                  case 'w': // w    word immediate operand
+                    ++immed_offset;
+                    // Fall through
+                  case '1': // b    byte index offset
+                  case 'b': // b    byte immediate operand
+                  case 'd': // d    direct addressing
+                  case 's': // s    signed byte immediate
+                    ++immed_offset;
+                    break;
+
+                  case 'B': // B    bit number
+                    {
+                      t_index var_i;
+                      uint bit = (rom->get(addr+1) & 0xf) >> 1;
+                      if (vars->by_addr.search(rom, operand, bit, bit, var_i))
+                        var_name= vars->by_addr.at(var_i)->get_name();
+                      else
+                        switch (bit)
+                          {
+                            default:
+                            case 0: var_name= "bit0"; break;
+                            case 1: var_name= "bit1"; break;
+                            case 2: var_name= "bit2"; break;
+                            case 3: var_name= "bit3"; break;
+                            case 4: var_name= "bit4"; break;
+                            case 5: var_name= "bit5"; break;
+                            case 6: var_name= "bit6"; break;
+                            case 7: var_name= "bit7"; break;
+                          }
+                    }
+                    break;
+
+                  case 'e': // e    extended 24bit immediate operand
+                    operand= ((rom->get(addr+immed_offset)<<16) |
+                              (rom->get(addr+immed_offset+1)<<8) |
+                              (rom->get(addr+immed_offset+2)));
+                    ++immed_offset;
+                    ++immed_offset;
+                    ++immed_offset;
+                    break;
+                  case 'x': // x    extended addressing
+                    operand= ((rom->get(addr+immed_offset)<<8) |
+                              (rom->get(addr+immed_offset+1)));
+                    ++immed_offset;
+                    ++immed_offset;
+                    break;
+                  case 'p': // b    byte index offset
+                    {
+                      long int base;
+                      i8_t offs;
+                      base= addr+immed_offset+1;
+                      offs= rom->get(addr+immed_offset);
+                      operand= base+offs;
+                      ++immed_offset;
+                    }
+                    break;
+                  default:
+                    break;
+                }
+            }
+        }
+
+      if (branch != ' ')
+        {
+          // If the target isn't already labelled we'll create one ourselves.
+          // N.B. With jumps, branches and calls the target address is always
+          // given by the last operand.
+          t_index var_i;
+          if (!vars->by_addr.search(rom, operand, rom->width, 0, var_i) &&
+              !vars->by_addr.search(rom, operand, -1, -1, var_i))
+            {
+              switch (branch)
+                {
+                  case '@':
+                    var_name = "func";
+                    break;
+
+                  case 't':
+                  case 'f':
+                    suffix = (branch == 't' ? "_isset" : "_unset");
+                    break;
+
+                  case 'H':
+                    var_name = "half_carry"; break;
+                  case 'h':
+                    var_name = "no_half_carry"; break;
+
+                  case 'I':
+                    var_name = "interrupt_pending"; break;
+                  case 'i':
+                    var_name = "no_interrupt_pending"; break;
+
+                  case 'V':
+                    var_name = "overflow"; break;
+                  case 'v':
+                    var_name = "no_overflow"; break;
+
+                  default:
+                    if (operand <= addr)
+                      var_name = "loop";
+                    else
+                      var_name = "label";
+                    break;
+                }
+
+              int index = 1;
+              do
+                {
+                  snprintf(label, sizeof(label)-1, ".%s%s$%u", var_name, suffix, index++);
+                  label[sizeof(label) - 1] = '\0';
+                }
+              while (vars->by_name.search(label, var_i));
+
+              class cl_var *v = new cl_var(label, rom, operand, chars("[analyze]"), -1, -1);
+              v->init();
+              vars->add(v);
+            }
+
+          analyze(operand);
+
+          if (branch == 'j')
+            return;
+        }
+
+      addr= rom->validate_address(addr + length);
+    }
+}
+
+void
 cl_stm8::disass(class cl_console_base *con, t_addr addr, const char *sep)
 {
   const char *b;
