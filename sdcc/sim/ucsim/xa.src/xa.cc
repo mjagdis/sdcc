@@ -520,11 +520,10 @@ disass - Disassemble an opcode.
     addr - address of opcode to disassemble/print.
     sep - optionally points to string(tab) to use as separator.
 |--------------------------------------------------------------------*/
-char *
-cl_xa::disass(t_addr addr, const char *sep)
+void
+cl_xa::disass(class cl_console_base *con, t_addr addr, const char *sep)
 {
-  char work[256], parm_str[40];
-  char *buf, *p, *b;
+  const char *b;
   int code;
   int len = 0;
   int immed_offset = 0;
@@ -532,15 +531,14 @@ cl_xa::disass(t_addr addr, const char *sep)
   int mnemonic;
   const char **reg_strs;
 
-  p= work;
-
   code = get_disasm_info(addr, &len, NULL, &immed_offset, &operands, &mnemonic);
 
   if (mnemonic == BAD_OPCODE) {
-    buf= (char*)malloc(30);
-    strcpy(buf, "UNKNOWN/INVALID");
-    return(buf);
+    con->dd_printf("UNKNOWN/INVALID");
+    return;
   }
+
+  con->dd_printf("%-5s ", op_mnemonic_str[mnemonic]);
 
   if (code & 0x0800)
     reg_strs = w_reg_strs;
@@ -550,36 +548,36 @@ cl_xa::disass(t_addr addr, const char *sep)
   switch(operands) {
      // the repeating common parameter encoding for ADD, ADDC, SUB, AND...
     case REG_REG :
-      sprintf(parm_str, "%s,%s",
+      con->dd_printf("%s,%s",
               reg_strs[((code >> 4) & 0xf)],
               reg_strs[(code & 0xf)]);
     break;
     case REG_IREG :
-      sprintf(parm_str, "%s,[%s]",
+      con->dd_printf("%s,[%s]",
               reg_strs[((code >> 4) & 0xf)],
               w_reg_strs[(code & 0xf)]);
     break;
     case IREG_REG :
-      sprintf(parm_str, "[%s],%s",
+      con->dd_printf("[%s],%s",
               w_reg_strs[(code & 0x7)],
               reg_strs[((code >> 4) & 0xf)] );
     break;
     case REG_IREGOFF8 :
-      sprintf(parm_str, "%s,[%s+%02x]",
+      con->dd_printf("%s,[%s+%02x]",
               reg_strs[((code >> 4) & 0xf)],
               w_reg_strs[(code & 0x7)],
               rom->get(addr+immed_offset));
       ++immed_offset;
     break;
     case IREGOFF8_REG :
-      sprintf(parm_str, "[%s+%02x],%s",
+      con->dd_printf("[%s+%02x],%s",
               w_reg_strs[(code & 0x7)],
               rom->get(addr+immed_offset),
               reg_strs[((code >> 4) & 0xf)] );
       ++immed_offset;
     break;
     case REG_IREGOFF16 :
-      sprintf(parm_str, "%s,[%s+%04x]",
+      con->dd_printf("%s,[%s+%04x]",
               reg_strs[((code >> 4) & 0xf)],
               w_reg_strs[(code & 0x7)],
               (short)((rom->get(addr+immed_offset+1)) |
@@ -588,7 +586,7 @@ cl_xa::disass(t_addr addr, const char *sep)
       ++immed_offset;
     break;
     case IREGOFF16_REG :
-      sprintf(parm_str, "[%s+%04x],%s",
+      con->dd_printf("[%s+%04x],%s",
               w_reg_strs[(code & 0x7)],
               (short)((rom->get(addr+immed_offset+1)) |
                      (rom->get(addr+immed_offset)<<8)),
@@ -597,37 +595,37 @@ cl_xa::disass(t_addr addr, const char *sep)
       ++immed_offset;
     break;
     case REG_IREGINC :
-      sprintf(parm_str, "%s,[%s+]",
+      con->dd_printf("%s,[%s+]",
               reg_strs[((code >> 4) & 0xf)],
               w_reg_strs[(code & 0xf)]);
     break;
     case IREGINC_REG :
-      sprintf(parm_str, "[%s+],%s",
+      con->dd_printf("[%s+],%s",
               w_reg_strs[(code & 0x7)],
               reg_strs[((code >> 4) & 0xf)] );
     break;
     case DIRECT_REG :
-      sprintf(parm_str, "%s,%s",
+      con->dd_printf("%s,%s",
               get_dir_name(((code & 0x7) << 8) |
                            rom->get(addr+immed_offset)),
               reg_strs[((code >> 4) & 0xf)] );
       ++immed_offset;
     break;
     case REG_DIRECT :
-      sprintf(parm_str, "%s,%s",
+      con->dd_printf("%s,%s",
               reg_strs[((code >> 4) & 0xf)],
               get_dir_name(((code & 0x7) << 8) |
                            rom->get(addr+immed_offset)));
       ++immed_offset;
     break;
     case REG_DATA8 :
-      sprintf(parm_str, "%s,#0x%02x",
+      con->dd_printf("%s,#0x%02x",
               b_reg_strs[((code >> 4) & 0xf)],
               rom->get(addr+immed_offset) );
       ++immed_offset;
     break;
     case REG_DATA16 :
-      sprintf(parm_str, "%s,#0x%04x",
+      con->dd_printf("%s,#0x%04x",
               reg_strs[((code >> 4) & 0xf)],
               (short)((rom->get(addr+immed_offset+1)) |
                      (rom->get(addr+immed_offset)<<8)) );
@@ -635,13 +633,13 @@ cl_xa::disass(t_addr addr, const char *sep)
       ++immed_offset;
     break;
     case IREG_DATA8 :
-      sprintf(parm_str, "[%s], 0x%02x",
+      con->dd_printf("[%s], 0x%02x",
               w_reg_strs[((code >> 4) & 0x7)],
               rom->get(addr+immed_offset) );
       ++immed_offset;
     break;
     case IREG_DATA16 :
-      sprintf(parm_str, "[%s], 0x%04x",
+      con->dd_printf("[%s], 0x%04x",
               w_reg_strs[((code >> 4) & 0x7)],
               (short)((rom->get(addr+immed_offset+1)) |
                      (rom->get(addr+immed_offset)<<8)) );
@@ -649,13 +647,13 @@ cl_xa::disass(t_addr addr, const char *sep)
       ++immed_offset;
     break;
     case IREGINC_DATA8 :
-      sprintf(parm_str, "[%s+], 0x%02x",
+      con->dd_printf("[%s+], 0x%02x",
               w_reg_strs[((code >> 4) & 0x7)],
               rom->get(addr+immed_offset) );
       ++immed_offset;
     break;
     case IREGINC_DATA16 :
-      sprintf(parm_str, "[%s+], 0x%04x",
+      con->dd_printf("[%s+], 0x%04x",
               w_reg_strs[((code >> 4) & 0x7)],
               (short)((rom->get(addr+immed_offset+1)) |
                      (rom->get(addr+immed_offset)<<8)) );
@@ -663,14 +661,14 @@ cl_xa::disass(t_addr addr, const char *sep)
       ++immed_offset;
     break;
     case IREGOFF8_DATA8 :
-      sprintf(parm_str, "[%s+%02x], 0x%02x",
+      con->dd_printf("[%s+%02x], 0x%02x",
               w_reg_strs[((code >> 4) & 0x7)],
               rom->get(addr+immed_offset),
               rom->get(addr+immed_offset+1) );
       immed_offset += 2;
     break;
     case IREGOFF8_DATA16 :
-      sprintf(parm_str, "[%s+%02x], 0x%04x",
+      con->dd_printf("[%s+%02x], 0x%04x",
               w_reg_strs[((code >> 4) & 0x7)],
               rom->get(addr+immed_offset),
               (short)((rom->get(addr+immed_offset+2)) |
@@ -678,7 +676,7 @@ cl_xa::disass(t_addr addr, const char *sep)
       immed_offset += 3;
     break;
     case IREGOFF16_DATA8 :
-      sprintf(parm_str, "[%s+%04x], 0x%02x",
+      con->dd_printf("[%s+%04x], 0x%02x",
               w_reg_strs[((code >> 4) & 0x7)],
               (short)((rom->get(addr+immed_offset+1)) |
                      (rom->get(addr+immed_offset+0)<<8)),
@@ -686,7 +684,7 @@ cl_xa::disass(t_addr addr, const char *sep)
       immed_offset += 3;
     break;
     case IREGOFF16_DATA16 :
-      sprintf(parm_str, "[%s+%04x], 0x%04x",
+      con->dd_printf("[%s+%04x], 0x%04x",
               w_reg_strs[((code >> 4) & 0x7)],
               (short)((rom->get(addr+immed_offset+1)) |
                      (rom->get(addr+immed_offset+0)<<8)),
@@ -695,14 +693,14 @@ cl_xa::disass(t_addr addr, const char *sep)
       immed_offset += 4;
     break;
     case DIRECT_DATA8 :
-      sprintf(parm_str, "%s,#0x%02x",
+      con->dd_printf("%s,#0x%02x",
               get_dir_name(((code & 0x0070) << 4) |
                            rom->get(addr+immed_offset)),
               rom->get(addr+immed_offset+1));
       immed_offset += 3;
     break;
     case DIRECT_DATA16 :
-      sprintf(parm_str, "%s,#0x%04x",
+      con->dd_printf("%s,#0x%04x",
               get_dir_name(((code & 0x0070) << 4) |
                            rom->get(addr+immed_offset)),
               rom->get(addr+immed_offset+2) +
@@ -712,95 +710,95 @@ cl_xa::disass(t_addr addr, const char *sep)
 
 // odd-ball ones
     case NO_OPERANDS :  // for NOP
-      strcpy(parm_str, "");
+      break;
     break;
     case CY_BIT :
-      sprintf(parm_str, "C,%s",
+      con->dd_printf("C,%s",
              get_bit_name(((code&0x0003)<<8) + rom->get(addr+2)));
     break;
     case BIT_CY :
-      sprintf(parm_str, "%s,C",
+      con->dd_printf("%s,C",
               get_bit_name(((code&0x0003)<<8) + rom->get(addr+2)));
     break;
     case REG_DATA4 :
-      strcpy(parm_str, "REG_DATA4");
+      con->dd_printf("REG_DATA4");
     break;
     case REG_DATA5 :
-      strcpy(parm_str, "REG_DATA5");
+      con->dd_printf("REG_DATA5");
     break;
     case IREG_DATA4 :
-      strcpy(parm_str, "IREG_DATA4");
+      con->dd_printf("IREG_DATA4");
     break;
     case IREGINC_DATA4 :
-      strcpy(parm_str, "IREGINC_DATA4");
+      con->dd_printf("IREGINC_DATA4");
     break;
     case IREGOFF8_DATA4 :
-      strcpy(parm_str, "IREGOFF8_DATA4");
+      con->dd_printf("IREGOFF8_DATA4");
     break;
     case IREGOFF16_DATA4 :
-      strcpy(parm_str, "IREGOFF16_DATA4");
+      con->dd_printf("IREGOFF16_DATA4");
     break;
     case DIRECT_DATA4 :
-      sprintf(parm_str, "%s,#0x%x",
+      con->dd_printf("%s,#0x%x",
 	      get_dir_name(((code & 0x70)<<4) |
 			   rom->get(addr+2)),
 	      code&0x0f);
     break;
     case DIRECT :
-      sprintf(parm_str, "%s",
+      con->dd_printf("%s",
               get_dir_name(((code & 0x007) << 4) +
                            rom->get(addr+2)));
     break;
     case REG :
-      sprintf(parm_str, "%s",
+      con->dd_printf("%s",
               reg_strs[((code >> 4) & 0xf)] );
     break;
     case IREG :
-      sprintf(parm_str, "[%s]",
+      con->dd_printf("[%s]",
               reg_strs[((code >> 4) & 0xf)] );
     break;
     case BIT_ALONE :
-      sprintf(parm_str, "%s",
+      con->dd_printf("%s",
 	      get_bit_name(((code&0x0003)<<8) + rom->get(addr+2)));
     break;
     case BIT_REL8 :
-      sprintf(parm_str, "%s,0x%04lx",
+      con->dd_printf("%s,0x%04lx",
 	      get_bit_name((code&0x0003)<<8) + rom->get(addr+2),
 	      (long)(((signed char)rom->get(addr+3)*2+addr+len)&0xfffe));
     break;
     case DATA4:
-      sprintf(parm_str, "#0x%02x", code&0x0f);
+      con->dd_printf("#0x%02x", code&0x0f);
       break;
     case ADDR24 :
-      sprintf(parm_str, "0x%06x",
+      con->dd_printf("0x%06x",
              (rom->get(addr+3)<<16) +
              (rom->get(addr+1)<<8) +
              rom->get(addr+2));
       break;
     break;
     case REG_REL8 :
-      sprintf(parm_str, "%s,0x%04lx",
+      con->dd_printf("%s,0x%04lx",
 	      reg_strs[(code>>4) & 0xf],
 	      (long)(((signed char)rom->get(addr+2)*2+addr+len)&0xfffe));
     break;
     case DIRECT_REL8 :
-      sprintf(parm_str, "%s,0x%04lx",
+      con->dd_printf("%s,0x%04lx",
 	      get_dir_name(((code&0x07)<<8) +
 			   rom->get(addr+2)),
 	      (long)(((signed char)rom->get(addr+2)*2+addr+len)&0xfffe));
     break;
     case REG_USP:
-      sprintf(parm_str, "REG_USP");
+      con->dd_printf("REG_USP");
     break;
     case USP_REG:
-      sprintf(parm_str, "USP_REG");
+      con->dd_printf("USP_REG");
     break;
     case REL8 :
-      sprintf(parm_str, "0x%04lx",
+      con->dd_printf("0x%04lx",
 	      (long)(((signed char)rom->get(addr+1)*2+addr+len)&0xfffe));
     break;
     case REL16 :
-      sprintf(parm_str, "0x%04lx",
+      con->dd_printf("0x%04lx",
 	      (long)(((signed short)((rom->get(addr+1)<<8) + rom->get(addr+2))*2+addr+len)&0xfffe));
     break;
 
@@ -811,76 +809,76 @@ cl_xa::disass(t_addr addr, const char *sep)
       parm_str[0]='\0';
       if (code&0x0800) { // word list
 	if (code&0x4000) { // R8-R15
-	  if (rlist&0x80) strcat (parm_str, "R15 ");
-	  if (rlist&0x40) strcat (parm_str, "R14");
-	  if (rlist&0x20) strcat (parm_str, "R13 ");
-	  if (rlist&0x10) strcat (parm_str, "R12 ");
-	  if (rlist&0x08) strcat (parm_str, "R11 ");
-	  if (rlist&0x04) strcat (parm_str, "R10 ");
-	  if (rlist&0x02) strcat (parm_str, "R9 ");
-	  if (rlist&0x01) strcat (parm_str, "R8 ");
+	  if (rlist&0x80) con->dd_printf("R15 ");
+	  if (rlist&0x40) con->dd_printf("R14");
+	  if (rlist&0x20) con->dd_printf("R13 ");
+	  if (rlist&0x10) con->dd_printf("R12 ");
+	  if (rlist&0x08) con->dd_printf("R11 ");
+	  if (rlist&0x04) con->dd_printf("R10 ");
+	  if (rlist&0x02) con->dd_printf("R9 ");
+	  if (rlist&0x01) con->dd_printf("R8 ");
 	} else { // R7-R0
-	  if (rlist&0x80) strcat (parm_str, "R7 ");
-	  if (rlist&0x40) strcat (parm_str, "R6 ");
-	  if (rlist&0x20) strcat (parm_str, "R5 ");
-	  if (rlist&0x10) strcat (parm_str, "R4 ");
-	  if (rlist&0x08) strcat (parm_str, "R3 ");
-	  if (rlist&0x04) strcat (parm_str, "R2 ");
-	  if (rlist&0x02) strcat (parm_str, "R1 ");
-	  if (rlist&0x01) strcat (parm_str, "R0 ");
+	  if (rlist&0x80) con->dd_printf("R7 ");
+	  if (rlist&0x40) con->dd_printf("R6 ");
+	  if (rlist&0x20) con->dd_printf("R5 ");
+	  if (rlist&0x10) con->dd_printf("R4 ");
+	  if (rlist&0x08) con->dd_printf("R3 ");
+	  if (rlist&0x04) con->dd_printf("R2 ");
+	  if (rlist&0x02) con->dd_printf("R1 ");
+	  if (rlist&0x01) con->dd_printf("R0 ");
 	}
       } else { // byte list
 	if (code&0x4000) { //R7h-R4l
-	  if (rlist&0x80) strcat (parm_str, "R7h ");
-	  if (rlist&0x40) strcat (parm_str, "R7l ");
-	  if (rlist&0x20) strcat (parm_str, "R6h ");
-	  if (rlist&0x10) strcat (parm_str, "R6l ");
-	  if (rlist&0x08) strcat (parm_str, "R5h ");
-	  if (rlist&0x04) strcat (parm_str, "R5l ");
-	  if (rlist&0x02) strcat (parm_str, "R4h ");
-	  if (rlist&0x01) strcat (parm_str, "R4l ");
+	  if (rlist&0x80) con->dd_printf("R7h ");
+	  if (rlist&0x40) con->dd_printf("R7l ");
+	  if (rlist&0x20) con->dd_printf("R6h ");
+	  if (rlist&0x10) con->dd_printf("R6l ");
+	  if (rlist&0x08) con->dd_printf("R5h ");
+	  if (rlist&0x04) con->dd_printf("R5l ");
+	  if (rlist&0x02) con->dd_printf("R4h ");
+	  if (rlist&0x01) con->dd_printf("R4l ");
 	} else { // R3h-R0l
-	  if (rlist&0x80) strcat (parm_str, "R3h ");
-	  if (rlist&0x40) strcat (parm_str, "R3l ");
-	  if (rlist&0x20) strcat (parm_str, "R2h ");
-	  if (rlist&0x10) strcat (parm_str, "R2l ");
-	  if (rlist&0x08) strcat (parm_str, "R1h ");
-	  if (rlist&0x04) strcat (parm_str, "R1l ");
-	  if (rlist&0x02) strcat (parm_str, "R0h ");
-	  if (rlist&0x01) strcat (parm_str, "R0l ");
+	  if (rlist&0x80) con->dd_printf("R3h ");
+	  if (rlist&0x40) con->dd_printf("R3l ");
+	  if (rlist&0x20) con->dd_printf("R2h ");
+	  if (rlist&0x10) con->dd_printf("R2l ");
+	  if (rlist&0x08) con->dd_printf("R1h ");
+	  if (rlist&0x04) con->dd_printf("R1l ");
+	  if (rlist&0x02) con->dd_printf("R0h ");
+	  if (rlist&0x01) con->dd_printf("R0l ");
 	}
       }
     }
     break;
 
     case REG_DIRECT_REL8 :
-      sprintf(parm_str, "%s,%s,0x%02x",
+      con->dd_printf("%s,%s,0x%02x",
               reg_strs[((code >> 4) & 0xf)],
               get_dir_name(((code & 0x7) << 8) +
                            rom->get(addr+immed_offset)),
               ((signed char) rom->get(addr+immed_offset+1) * 2) & 0xfffe );
     break;
     case REG_DATA8_REL8 :
-      sprintf(parm_str, "%s,#0x%02x,0x%02x",
+      con->dd_printf("%s,#0x%02x,0x%02x",
               reg_strs[((code >> 4) & 0xf)],
               rom->get(addr+immed_offset+1),
               ((signed char)rom->get(addr+immed_offset) * 2) & 0xfffe );
     break;
     case REG_DATA16_REL8 :
-      sprintf(parm_str, "%s,#0x%04x,0x%02x",
+      con->dd_printf("%s,#0x%04x,0x%02x",
               w_reg_strs[(code >> 4) & 0xf],
               rom->get(addr+immed_offset+2) +
                  (rom->get(addr+immed_offset+1)<<8),
               ((signed char)rom->get(addr+immed_offset) * 2) & 0xfffe );
     break;
     case IREG_DATA8_REL8 :
-      sprintf(parm_str, "[%s],#0x%02x,0x%02x",
+      con->dd_printf("[%s],#0x%02x,0x%02x",
               reg_strs[((code >> 4) & 0x7)],
               rom->get(addr+immed_offset+1),
               ((signed char)rom->get(addr+immed_offset) * 2) & 0xfffe );
     break;
     case IREG_DATA16_REL8 :
-      sprintf(parm_str, "[%s],#0x%04x,0x%02x",
+      con->dd_printf("[%s],#0x%04x,0x%02x",
               w_reg_strs[(code >> 4) & 0x7],
               rom->get(addr+immed_offset+2) +
 	        (rom->get(addr+immed_offset+1)<<8),
@@ -888,22 +886,22 @@ cl_xa::disass(t_addr addr, const char *sep)
     break;
 
     case A_APLUSDPTR :
-      strcpy(parm_str, "A, [A+DPTR]");
+      con->dd_printf("A, [A+DPTR]");
     break;
 
     case A_APLUSPC :
-      strcpy(parm_str, "A, [A+PC]");
+      con->dd_printf("A, [A+PC]");
     break;
 
     case REG_REGOFF8 :
-      sprintf(parm_str, "%s,%s+0x%02x",
+      con->dd_printf("%s,%s+0x%02x",
               w_reg_strs[(code >> 4) & 0x7],
               w_reg_strs[code & 0x7],
               rom->get(addr+immed_offset));
       break;
 
     case REG_REGOFF16 :
-      sprintf(parm_str, "%s,%s+0x%02x",
+      con->dd_printf("%s,%s+0x%02x",
               w_reg_strs[(code >> 4) & 0x7],
               w_reg_strs[code & 0x7],
               rom->get(addr+immed_offset+1) +
@@ -911,47 +909,18 @@ cl_xa::disass(t_addr addr, const char *sep)
       break;
 
     case A_PLUSDPTR :
-      strcpy(parm_str, "[A+DPTR]");
+      con->dd_printf("[A+DPTR]");
       break;
 
     case IIREG :
-      sprintf(parm_str, "[[%s]]",
+      con->dd_printf("[[%s]]",
               w_reg_strs[(code & 0x7)]);
       break;
 
     default:
-      strcpy(parm_str, "???");
+      con->dd_printf("???");
     break;
   }
-
-  sprintf(work, "%s %s",
-          op_mnemonic_str[ mnemonic ],
-          parm_str);
-
-  p= strchr(work, ' ');
-  if (!p)
-    {
-      buf= strdup(work);
-      return(buf);
-    }
-  if (sep == NULL)
-    buf= (char *)malloc(6+strlen(p)+1);
-  else
-    buf= (char *)malloc((p-work)+strlen(sep)+strlen(p)+1);
-
-  for (p= work, b= buf; *p != ' '; p++, b++)
-    *b= *p;
-  p++;
-  *b= '\0';
-  if (sep == NULL)
-    {
-      while (strlen(buf) < 6)
-        strcat(buf, " ");
-    }
-  else
-    strcat(buf, sep);
-  strcat(buf, p);
-  return(buf);
 }
 
 /*--------------------------------------------------------------------

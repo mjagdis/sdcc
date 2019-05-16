@@ -110,8 +110,8 @@ public:
   virtual int clock_per_cycle(void) { return(12); }
   virtual struct dis_entry *dis_tbl(void);
   virtual struct name_entry *bit_tbl(void);
-  virtual char *disass(t_addr addr, const char *sep);
-  virtual void   print_regs(class cl_console_base *con);
+  virtual void disass(class cl_console_base *con, t_addr addr, const char *sep);
+  virtual void print_regs(class cl_console_base *con);
   virtual class cl_address_space *bit2mem(t_addr bitaddr,
 					  t_addr *memaddr,
 					  int *bitnr_high,
@@ -119,8 +119,8 @@ public:
   virtual t_addr bit_address(class cl_memory *mem,
 			     t_addr mem_address,
 			     int bit_number);
-  virtual void   daddr_name(t_addr addr, char *buf);
-  virtual void   baddr_name(t_addr addr, char *buf);
+  virtual void   daddr_name(class cl_console_base *con, t_addr addr);
+  virtual void   baddr_name(class cl_console_base *con, t_addr addr);
   
   virtual void   reset(void);
   virtual void   clear_sfr(void);

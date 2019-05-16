@@ -206,12 +206,13 @@ cl_sim::stop(int reason, class cl_ev_brk *ebrk)
 	    {
 	      class cl_ev_brk *eb= (cl_ev_brk*)b;
 	      class cl_address_space *m= eb->get_mem();
-	      cmd->frozen_console->dd_printf("Event `%s' at %s[0x%x]: 0x%x %s\n",
-					     eb->id, m?(m->get_name()):"mem?",
-					     AU(eb->addr),
-					     AU(uc->instPC),
-					     uc->disass(uc->instPC, " "));
-    	    }
+	      cmd->frozen_console->dd_printf("Event `%s' at %s[0x%x]: 0x%x ",
+                                             eb->id, m?(m->get_name()):"mem?",
+                                             AU(eb->addr),
+                                             AU(uc->instPC));
+	      uc->disass(cmd->frozen_console, uc->instPC, " ");
+	      cmd->frozen_console->dd_printf("\n");
+	    }
 	  break;
 	case resINTERRUPT:
 	  cmd->frozen_console->dd_printf("Interrupt\n");
@@ -292,10 +293,11 @@ cl_sim::stop(class cl_ev_brk *brk)
       cmd->frozen_console)
     {
       class cl_console_base *con= cmd->frozen_console;
-      con->dd_printf("Event `%s' at %s[0x%x]: 0x%x %s\n",
+      con->dd_printf("Event `%s' at %s[0x%x]: 0x%x ",
 		     brk->id, brk->get_mem()->get_name(), (int)brk->addr,
-		     (int)uc->instPC,
-		     uc->disass(uc->instPC, " "));
+		     (int)uc->instPC);
+      uc->disass(con, uc->instPC, " ");
+      con->dd_printf("\n");
     }
   if (!(state & SIM_GO) &&
       q_opt)

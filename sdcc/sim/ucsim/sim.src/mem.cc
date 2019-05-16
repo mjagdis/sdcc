@@ -62,6 +62,7 @@ cl_memory::cl_memory(const char *id, t_addr asize, int awidth):
     size= max_mem_size;
   set_name(id);
   addr_format= data_format= 0;
+  addr_format_width= data_format_width= 0;
   width= awidth;
   start_address= 0;
   uc= 0;
@@ -79,24 +80,25 @@ cl_memory::~cl_memory(void)
 int
 cl_memory::init(void)
 {
-  chars c= chars("",
-		 //addr_format= (char *)malloc(10);
-		 /*sprintf(addr_format,*/ "0x%%0%d",
-	  size-1<=0xf?1:
-	  (size-1<=0xff?2:
-	   (size-1<=0xfff?3:
-	    (size-1<=0xffff?4:
-	     (size-1<=0xfffff?5:
-	      (size-1<=0xffffff?6:12))))));
+  addr_format_width= 2 +
+                     (size-1<=0xf ? 1 :
+                      (size-1<=0xff ? 2 :
+                       (size-1<=0xfff ? 3 :
+                        (size-1<=0xffff ? 4 :
+                         (size-1<=0xfffff ? 5 :
+                          (size-1<=0xffffff ? 6 : 12))))));
+
+  chars c= chars("", "0x%%0%d", addr_format_width - 2);
   if (sizeof(t_addr) > sizeof(long))
     c+= cchars("L");//strcat(addr_format, "L");
   else if (sizeof(t_addr) > sizeof(int))
     c+= cchars("l");//strcat(addr_format, "l");
   c+= cchars("x");//strcat(addr_format, "x");
   addr_format= strdup((char*)c);
-  //data_format= (char *)malloc(10);
-  c= cchars("");
-  /*sprintf(data_*/c.format(/*"0x"*/"%%0%d", width/4+((width%4)?1:0));
+
+  data_format_width= (width + 3) / 4;
+
+  c= chars("", "%%0%d", data_format_width);
   if (sizeof(t_mem) > sizeof(long))
     c+= cchars("L");//strcat(data_format, "L");
   else if (sizeof(t_mem) > sizeof(int))

@@ -69,6 +69,7 @@ protected:
   t_addr size;
 public:
   char *addr_format, *data_format;
+  int addr_format_width, data_format_width;
   int width; // in bits
   t_mem data_mask;
   bool hidden;

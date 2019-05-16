@@ -167,10 +167,10 @@ static const char *puiks= keysets[puik];
 static class cl_port_data pd;
 
 void
-cl_stm8::mk_port(t_addr base, chars n)
+cl_stm8::mk_port(int portnr, chars n)
 {
   class cl_port *p;
-  add_hw(p= new cl_port(this, base, n));
+  add_hw(p= new cl_port(this, portnr, n));
   p->init();
 
   pd.set_name(n);
@@ -198,6 +198,7 @@ void
 cl_stm8::mk_hw_elements(void)
 {
   class cl_hw *h;
+  class cl_it_src *is;
   cl_uc::mk_hw_elements();
   class cl_option *o;
 
@@ -348,18 +349,31 @@ cl_stm8::mk_hw_elements(void)
   add_hw(itc= new cl_itc(this));
   itc->init();
 
-  {
-    mk_port(0x5000, "pa");
-    mk_port(0x5005, "pb");
-    mk_port(0x500a, "pc");
-    mk_port(0x500f, "pd");
-  }
+  mk_port(0, "pa");
+  mk_port(1, "pb");
+  mk_port(2, "pc");
+  mk_port(3, "pd");
   
   if (type->type == CPU_STM8S)
     {
       // all S and AF
-      mk_port(0x5014, "pe");
-      mk_port(0x5019, "pf");
+      mk_port(4, "pe");
+      mk_port(5, "pf");
+
+      char name[] = "EXTI0";
+      for (int i= 0; i <= 4; i++, name[4]++)
+        {
+          it_sources->add(is= new cl_it_src(this, 3 + i,
+                    itc->exti_sr1, 1 << i,
+                    itc->exti_sr1, 1 << i,
+                    0x8014 + i * 4,
+                    true, // STM8S has no EXTI_SR[12] so port interrupts autoclear and are not ack'd.
+                    false,
+                    strdup(name),
+                    25*10+i));
+          is->init();
+        }
+
       if (type->subtype & (DEV_STM8S005|
 			   DEV_STM8S007|
 			   DEV_STM8S105|
@@ -368,11 +382,11 @@ cl_stm8::mk_hw_elements(void)
 			   DEV_STM8AF52|
 			   DEV_STM8AF62_46))
 	{
-	  mk_port(0x501e, "pg");
+	  mk_port(6, "pg");
 	  if (type->subtype != DEV_STM8AF62_46)
 	    {
-	      mk_port(0x5023, "ph");
-	      mk_port(0x5028, "pi");
+	      mk_port(7, "ph");
+	      mk_port(8, "pi");
 	    }
 	}
       add_hw(h= new cl_rst(this, 0x50b3, 0x1f));
@@ -413,70 +427,173 @@ cl_stm8::mk_hw_elements(void)
 	  h->init();
 	}
     }
-  else if (type->type == CPU_STM8L)
+  else
     {
-      if (type->subtype != DEV_STM8L051)
-	{
-	  mk_port(0x5014, "pe");
-	  mk_port(0x5019, "pf");
-	}
-      if (type->subtype & (DEV_STM8AL3xE|
-			   DEV_STM8AL3x8|
-			   DEV_STM8L052R|
-			   DEV_STM8L15x8|
-			   DEV_STM8L162))
-	{
-	  mk_port(0x501e, "pg");
-	  if (type->subtype != DEV_STM8L052R)
+      char name[] = "EXTI0";
+      for (int i= 0; i <= 7; i++, name[4]++)
+        {
+          it_sources->add(is= new cl_it_src(this, 8 + i,
+                    itc->exti_sr1, 1 << i,
+                    itc->exti_sr1, 1 << i,
+                    0x8028 + i * 4,
+                    false,
+                    false,
+                    strdup(name),
+                    25*10+i));
+          is->init();
+        }
+
+      if (type->type == CPU_STM8L)
+        {
+          if (type->subtype != DEV_STM8L051)
 	    {
-	      mk_port(0x5023, "ph");
-	      mk_port(0x5028, "pi");
+	      mk_port(0x5014, "pe");
+	      mk_port(0x5019, "pf");
+
+              it_sources->add(is= new cl_it_src(this, 5,
+                        itc->exti_sr2, (1 << 3) | (1 << 2),
+                        itc->exti_sr2, (1 << 3) | (1 << 2),
+                        0x801c,
+                        false,
+                        false,
+                        "EXTIE/F/PVD",
+                        25*10+5));
+              is->init();
 	    }
-	}
-      add_hw(h= new cl_rst(this, 0x50b0+1, 0x3f));
-      h->init();
-      add_hw(h= new cl_tim2_all(this, 2, 0x5250));
-      h->init();
-      add_hw(h= new cl_tim3_all(this, 3, 0x5280));
-      h->init();
-      add_hw(h= new cl_tim4_all(this, 4, 0x52E0));
-      h->init();
-      // all AL
-      if (type->subtype & DEV_STM8AL)
-	{
-	  add_hw(h= new cl_tim1_all(this, 1, 0x52b0));
-	  h->init();
-	}
-      // some L
-      if (type->subtype & (DEV_STM8L052C |
-			   DEV_STM8L052R |
-			   DEV_STM8L15x46 |
-			   DEV_STM8L15x8 |
-			   DEV_STM8L162))
-	{
-	  add_hw(h= new cl_tim1_all(this, 1, 0x52b0));
-	  h->init();
-	}
-      if (type->subtype & (DEV_STM8AL3xE |
-			   DEV_STM8AL3x8 |
-			   DEV_STM8L052R |
-			   DEV_STM8L15x8 |
-			   DEV_STM8L162))
-	{
-	  add_hw(h= new cl_tim5_all(this, 5, 0x5300));
-	  h->init();
-	}
-    }
-  else if (type->type == CPU_STM8L101)
-    {
-      add_hw(h= new cl_rst(this, 0x50b0+1, 0x0f));
-      h->init();
-      add_hw(h= new cl_tim2_l101(this, 2, 0x5250));
-      h->init();
-      add_hw(h= new cl_tim3_l101(this, 2, 0x5280));
-      h->init();
-      add_hw(h= new cl_tim4_l101(this, 4, 0x52E0));
-      h->init();
+
+          if (type->subtype & (DEV_STM8AL3xE|
+			       DEV_STM8AL3x8|
+			       DEV_STM8L052R|
+			       DEV_STM8L15x8|
+			       DEV_STM8L162))
+	    {
+	      mk_port(0x501e, "pg");
+
+              it_sources->add(is= new cl_it_src(this, 6,
+                        itc->exti_sr2, (1 << 4) | (1 << 0),
+                        itc->exti_sr2, (1 << 4) | (1 << 0),
+                        0x8020,
+                        false,
+                        false,
+                        "EXTIB/G",
+                        25*10+6));
+              is->init();
+
+	      if (type->subtype != DEV_STM8L052R)
+	        {
+	          mk_port(0x5023, "ph");
+	          mk_port(0x5028, "pi");
+
+                  it_sources->add(is= new cl_it_src(this, 7,
+                            itc->exti_sr2, (1 << 5) | (1 << 1),
+                            itc->exti_sr2, (1 << 5) | (1 << 1),
+                            0x8024,
+                            false,
+                            false,
+                            "EXTID/H",
+                            25*10+7));
+                  is->init();
+	        }
+              else
+                {
+                  it_sources->add(is= new cl_it_src(this, 7,
+                            itc->exti_sr2, (1 << 1),
+                            itc->exti_sr2, (1 << 1),
+                            0x8024,
+                            false,
+                            false,
+                            "EXTID",
+                            25*10+7));
+                  is->init();
+                }
+	    }
+          else
+            {
+              it_sources->add(is= new cl_it_src(this, 6,
+                        itc->exti_sr2, (1 << 0),
+                        itc->exti_sr2, (1 << 0),
+                        0x8020,
+                        false,
+                        false,
+                        "EXTIB",
+                        25*10+6));
+              is->init();
+
+              it_sources->add(is= new cl_it_src(this, 7,
+                        itc->exti_sr2, (1 << 1),
+                        itc->exti_sr2, (1 << 1),
+                        0x8024,
+                        false,
+                        false,
+                        "EXTID",
+                        25*10+7));
+              is->init();
+            }
+
+          add_hw(h= new cl_rst(this, 0x50b0+1, 0x3f));
+          h->init();
+          add_hw(h= new cl_tim2_all(this, 2, 0x5250));
+          h->init();
+          add_hw(h= new cl_tim3_all(this, 3, 0x5280));
+          h->init();
+          add_hw(h= new cl_tim4_all(this, 4, 0x52E0));
+          h->init();
+          // all AL
+          if (type->subtype & DEV_STM8AL)
+	    {
+	      add_hw(h= new cl_tim1_all(this, 1, 0x52b0));
+	      h->init();
+	    }
+          // some L
+          if (type->subtype & (DEV_STM8L052C |
+			       DEV_STM8L052R |
+			       DEV_STM8L15x46 |
+			       DEV_STM8L15x8 |
+			       DEV_STM8L162))
+	    {
+	      add_hw(h= new cl_tim1_all(this, 1, 0x52b0));
+	      h->init();
+	    }
+          if (type->subtype & (DEV_STM8AL3xE |
+			       DEV_STM8AL3x8 |
+			       DEV_STM8L052R |
+			       DEV_STM8L15x8 |
+			       DEV_STM8L162))
+	    {
+	      add_hw(h= new cl_tim5_all(this, 5, 0x5300));
+	      h->init();
+	    }
+        }
+      else if (type->type == CPU_STM8L101)
+        {
+          add_hw(h= new cl_rst(this, 0x50b0+1, 0x0f));
+          h->init();
+          add_hw(h= new cl_tim2_l101(this, 2, 0x5250));
+          h->init();
+          add_hw(h= new cl_tim3_l101(this, 2, 0x5280));
+          h->init();
+          add_hw(h= new cl_tim4_l101(this, 4, 0x52E0));
+          h->init();
+
+          it_sources->add(is= new cl_it_src(this, 6,
+                    itc->exti_sr2, (1 << 0),
+                    itc->exti_sr2, (1 << 0),
+                    0x8020,
+                    false,
+                    false,
+                    "EXTIB",
+                    25*10+6));
+          is->init();
+          it_sources->add(is= new cl_it_src(this, 7,
+                    itc->exti_sr2, (1 << 1),
+                    itc->exti_sr2, (1 << 1),
+                    0x8024,
+                    false,
+                    false,
+                    "EXTID",
+                    25*10+7));
+          is->init();
+        }
     }
 
   // UID
@@ -508,10 +625,14 @@ cl_stm8::mk_hw_elements(void)
       add_hw(flash_ctrl= new cl_saf_flash(this, 0x505a));
       flash_ctrl->init();
     }
-  else if (type->subtype & (DEV_STM8ALL |
-			    DEV_STM8L101))
+  else if (type->subtype & (DEV_STM8ALL))
     {
       add_hw(flash_ctrl= new cl_l_flash(this, 0x5050));
+      flash_ctrl->init();
+    }
+  else if (type->subtype & (DEV_STM8L101))
+    {
+      add_hw(flash_ctrl= new cl_l101_flash(this, 0x5050));
       flash_ctrl->init();
     }
   //add_hw(h= new cl_tim235(this, 3, 0x5320));
@@ -819,86 +940,108 @@ cl_stm8::get_disasm_info(t_addr addr,
   return b;
 }
 
-char *
-cl_stm8::disass(t_addr addr, const char *sep)
+void
+cl_stm8::disass(class cl_console_base *con, t_addr addr, const char *sep)
 {
-  char work[256], temp[20];
   const char *b;
-  char *buf, *p, *t;
   int len = 0;
   int immed_offset = 0;
-
-
-  p= work;
+  t_addr operand = 0;
 
   b = get_disasm_info(addr, &len, NULL, &immed_offset, NULL);
 
   if (b == NULL) {
-    buf= (char*)malloc(30);
-    strcpy(buf, "UNKNOWN/INVALID");
-    return(buf);
+    con->dd_printf("UNKNOWN/INVALID");
+    return;
   }
 
-  while (*b)
+  // Output everything up to the first space then pad.
+  int i;
+  for (i= 0; b[i]; i++)
     {
-      if (*b == '%')
+      if (b[i] == ' ')
+        {
+          con->dd_printf("%-*.*s", i, i, b);
+          if (sep)
+            con->dd_printf("%s", sep);
+          else
+            con->dd_printf("%*s", 6 - i, "");
+          b= &b[i + 1];
+          break;
+        }
+    }
+
+  for (; *b; b++)
+    {
+      if (b[0] == '%' && b[1])
         {
           b++;
-          switch (*(b++))
+          switch (*b)
             {
             case 's': // s    signed byte immediate
-              sprintf(temp, "#%d", (char)rom->get(addr+immed_offset));
+              con->dd_printf("#%d", (char)rom->get(addr+immed_offset));
               ++immed_offset;
               break;
             case 'e': // e    extended 24bit immediate operand
-              sprintf(temp, "#0x%06lx",
-                 (ulong)((rom->get(addr+immed_offset)<<16) |
+              operand= ((rom->get(addr+immed_offset)<<16) |
                         (rom->get(addr+immed_offset+1)<<8) |
-                        (rom->get(addr+immed_offset+2))) );
+                        (rom->get(addr+immed_offset+2)));
+              con->dd_printf("#");
+              if (!addr_name(con, rom, operand))
+                con->dd_printf("0x%06lx", operand);
               ++immed_offset;
               ++immed_offset;
               ++immed_offset;
               break;
             case 'w': // w    word immediate operand
-              sprintf(temp, "#0x%04x",
-                 (uint)((rom->get(addr+immed_offset)<<8) |
-                        (rom->get(addr+immed_offset+1))) );
+              operand= ((rom->get(addr+immed_offset)<<8) |
+                        (rom->get(addr+immed_offset+1)));
+              con->dd_printf("#");
+              if (!addr_name(con, rom, operand))
+                con->dd_printf("0x%04lx", operand);
               ++immed_offset;
               ++immed_offset;
               break;
             case 'b': // b    byte immediate operand
-              sprintf(temp, "#0x%02x", (uint)rom->get(addr+immed_offset));
+              con->dd_printf("#");
+              if (!addr_name(con, rom, addr + immed_offset))
+                con->dd_printf("0x%02x", (uint)rom->get(addr+immed_offset));
               ++immed_offset;
               break;
             case 'x': // x    extended addressing
-              sprintf(temp, "0x%04x",
-                 (uint)((rom->get(addr+immed_offset)<<8) |
-                        (rom->get(addr+immed_offset+1))) );
+              operand= ((rom->get(addr+immed_offset)<<8) |
+                        (rom->get(addr+immed_offset+1)));
+              if (!addr_name(con, rom, operand))
+                con->dd_printf("0x%04lx", operand);
               ++immed_offset;
               ++immed_offset;
               break;
             case 'd': // d    direct addressing
-              sprintf(temp, "0x%02x", (uint)rom->get(addr+immed_offset));
+              con->dd_printf("0x%02x", (uint)rom->get(addr+immed_offset));
               ++immed_offset;
               break;
             case '3': // 3    24bit index offset
-              sprintf(temp, "0x%06lx",
-                 (ulong)((rom->get(addr+immed_offset)<<16) |
+              operand= ((rom->get(addr+immed_offset)<<16) |
                         (rom->get(addr+immed_offset+1)<<8) |
-                        (rom->get(addr+immed_offset+2))) );
+                        (rom->get(addr+immed_offset+2)));
+              if (!addr_name(con, rom, operand))
+                con->dd_printf("0x%06lx", operand);
               ++immed_offset;
               ++immed_offset;
               ++immed_offset;
              break;
             case '2': // 2    word index offset
-              sprintf(temp, "0x%04x",
-                 (uint)((rom->get(addr+immed_offset)<<8) |
-                        (rom->get(addr+immed_offset+1))) );
+              operand= ((rom->get(addr+immed_offset)<<8) |
+                        (rom->get(addr+immed_offset+1)));
+              if (!addr_name(con, rom, operand))
+                con->dd_printf("0x%04lx", operand);
               ++immed_offset;
               ++immed_offset;
               break;
             case '1': // b    byte index offset
-              sprintf(temp, "0x%02x", (uint)rom->get(addr+immed_offset));
+              operand= rom->get(addr+immed_offset);
+              if (!addr_name(con, rom, operand))
+                con->dd_printf("0x%02lx", operand);
               ++immed_offset;
               break;
             case 'p': // b    byte index offset
@@ -907,51 +1050,30 @@ cl_stm8::disass(t_addr addr, const char *sep)
 		i8_t offs;
 		base= addr+immed_offset+1;
 		offs= rom->get(addr+immed_offset);
-		long int res= base+offs;
-		sprintf(temp, "0x%04lx",
-			/*(long int)(addr+immed_offset+1
-			  +(int)rom->get(addr+immed_offset))*/
-			res
-			);
+		operand= base+offs;
+                if (!addr_name(con, rom, operand))
+		  con->dd_printf("0x%04lx", operand);
 		++immed_offset;
 	      }
               break;
+            case 'B': // B    bit number
+              {
+                uint bit = (rom->get(addr+1) & 0xf) >> 1;
+                t_index var_i;
+                if (vars->by_addr.search(rom, operand, bit, bit, var_i))
+                  con->dd_printf("%s", vars->by_addr.at(var_i)->get_name());
+                else
+                  con->dd_printf("%u", bit);
+              }
+              break;
             default:
-              strcpy(temp, "?");
+              con->dd_printf("?");
               break;
             }
-          t= temp;
-          while (*t)
-            *(p++)= *(t++);
         }
       else
-        *(p++)= *(b++);
+        con->dd_printf("%c", *b);
     }
-  *p= '\0';
-
-  p= strchr(work, ' ');
-  if (!p)
-    {
-      buf= strdup(work);
-      return(buf);
-    }
-  if (sep == NULL)
-    buf= (char *)malloc(6+strlen(p)+1);
-  else
-    buf= (char *)malloc((p-work)+strlen(sep)+strlen(p)+1);
-  for (p= work, t= buf; *p != ' '; p++, t++)
-    *t= *p;
-  p++;
-  *t= '\0';
-  if (sep == NULL)
-    {
-      while (strlen(buf) < 6)
-        strcat(buf, " ");
-    }
-  else
-    strcat(buf, sep);
-  strcat(buf, p);
-  return(buf);
 }
 
 

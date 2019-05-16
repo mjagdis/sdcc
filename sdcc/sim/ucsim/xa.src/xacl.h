@@ -82,7 +82,7 @@ public:
                        int *parms,
                        int *mnemonic);
 
-  virtual char *disass(t_addr addr, const char *sep);
+  virtual void disass(class cl_console_base *con, t_addr addr, const char *sep);
   virtual void print_regs(class cl_console_base *con);
 
   virtual int exec_inst(void);

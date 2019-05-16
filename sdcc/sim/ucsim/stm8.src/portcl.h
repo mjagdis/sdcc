@@ -33,17 +33,28 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 class cl_port: public cl_hw
 {
- public:
-  class cl_memory_cell *cell_p, *cell_in, *cell_dir;
+ private:
+  int portnr;
   t_addr base;
  public:
-  cl_port(class cl_uc *auc, t_addr abase/*, int aid*/, const char *aname);
+  class cl_memory_cell *cell_p, *cell_in, *cell_dir, *cell_cr1, *cell_cr2;
+ public:
+  cl_port(class cl_uc *auc, int iportnr/*, int aid*/, const char *aname);
   virtual int init(void);
   virtual void reset(void);
 
   virtual void write(class cl_memory_cell *cell, t_mem *val);
 
   virtual void print_info(class cl_console_base *con);
+
+ private:
+  bool pin_or_port_high(t_mem exti_conf1, t_mem exti_conf2);
+  bool pin_or_port_low(t_mem exti_conf1, t_mem exti_conf2);
+  bool port_used_for_interrupt(t_mem exti_conf1, t_mem exti_conf2);
+  int port_sensitivity(t_mem exti_cr1, t_mem exti_cr2, t_mem exti_cr3, t_mem exti_cr4);
+  void port_interrupt(t_mem *exti_sr1, t_mem *exti_sr2);
+  void port_check_interrupt(t_mem input_and_enabled, t_mem in, t_mem prev_in, t_mem bitmask, int bithigh, int bitlow, t_mem exti_cr1, t_mem exti_cr2, t_mem exti_cr3, t_mem exti_cr4, t_mem *exti_sr1, t_mem *edge_exti_sr1, t_mem *exti_sr2, t_mem *edge_exti_sr2);
+  void pin_check_interrupt(t_mem input_and_enabled, t_mem exti_crn, t_mem in, t_mem prev_in, int bithigh, int bitlow, t_mem *exti_sr1, t_mem *edge_exti_sr1);
 };
 
 

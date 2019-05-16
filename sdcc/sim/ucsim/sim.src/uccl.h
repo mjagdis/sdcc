@@ -350,7 +350,7 @@ public:
   virtual void stop_when(class cl_time_measurer *t);
   
   // disassembling and symbol recognition
-  virtual char *disass(t_addr addr, const char *sep);
+  virtual void disass(class cl_console_base *con, t_addr addr, const char *sep);
   virtual struct dis_entry *dis_tbl(void);
   virtual void print_disass(t_addr addr, class cl_console_base *con);
   virtual void print_regs(class cl_console_base *con);
@@ -358,9 +358,9 @@ public:
   virtual int inst_branch(t_addr addr);
   virtual bool is_call(t_addr addr);
   virtual int longest_inst(void);
-  virtual bool addr_name(t_addr addr, class cl_address_space *as, char *buf);
-  virtual bool addr_name(t_addr addr, class cl_address_space *as, int bitnr, char *buf);
-  virtual bool addr_name(t_addr addr, class cl_address_space *as, int bitnr_high, int bitnr_low, char *buf);
+  virtual bool addr_name(class cl_console_base *con, class cl_address_space *as, t_addr addr);
+  virtual bool addr_name(class cl_console_base *con, class cl_address_space *as, t_addr addr, int bitnr);
+  virtual bool addr_name(class cl_console_base *con, class cl_address_space *as, t_addr addr, int bitnr_high, int bitnr_low);
   virtual bool symbol2address(char *sym,
 			      class cl_memory **mem,
 			      t_addr *addr);

@@ -37,8 +37,9 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 class cl_flash_cell: public cl_cell8
 {
  public:
- cl_flash_cell(uchar awidth): cl_cell8(awidth) {}
+  cl_flash_cell(uchar awidth): cl_cell8(awidth) {}
   virtual t_mem write(t_mem val);
+  virtual t_mem read(void);
 };
 
 class cl_flash_as: public cl_address_space
@@ -65,7 +66,8 @@ enum stm8_flash_state {
   fs_wait_data= 0x01,
   fs_pre_erase= 0x02,
   fs_program= 0x04,
-  fs_busy= fs_pre_erase|fs_program
+  fs_busy= fs_pre_erase|fs_program,
+  fs_powerdown= 0x10
 };
 
 enum stm8_flash_mode {
@@ -98,6 +100,9 @@ class cl_flash: public cl_hw
   double start_time;
  public:
   cl_flash(class cl_uc *auc, t_addr abase, const char *aname);
+
+  enum stm8_flash_state get_state(void) { return state; }
+
   virtual int init(void);
   virtual void registration(void) {}
   virtual int tick(int cycles);
@@ -114,6 +119,8 @@ class cl_flash: public cl_hw
   virtual void start_program(enum stm8_flash_state start_state);
   virtual void finish_program(bool ok);
 
+  virtual void wakeup(void);
+
   virtual const char *state_name(enum stm8_flash_state s);
   virtual void print_info(class cl_console_base *con);
 };
@@ -125,10 +132,19 @@ class cl_saf_flash: public cl_flash
   virtual void registration(void);
 };
 
-class cl_l_flash: public cl_flash
+class cl_l101_flash: public cl_flash
+{
+ public:
+  cl_l101_flash(class cl_uc *auc, t_addr abase);
+  virtual void registration(void);
+};
+
+class cl_l_flash: public cl_l101_flash
 {
  public:
   cl_l_flash(class cl_uc *auc, t_addr abase);
+  virtual void write(class cl_memory_cell *cell, t_mem *val);
+  virtual void wakeup(void);
   virtual void registration(void);
 };
 
